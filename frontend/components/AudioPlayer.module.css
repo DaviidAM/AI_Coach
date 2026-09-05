@@ -1,13 +1,17 @@
-/* WhatsApp-style audio player that lives INSIDE a chat bubble.
- * It stretches to fill the bubble width so there's no awkward whitespace. */
+/* WhatsApp-style audio player.
+ * Now lives as its own BLOCK below the text bubble (not inside it), so
+ * it has a minimum width to give the waveform room to breathe. */
 
 .player {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Fill the bubble's full width (bubble already has padding we bleed past) */
-  width: 100%;
-  min-width: 0;
+  padding: 0.5rem 0.625rem;
+  /* Match the bubble's max width so we never exceed it */
+  max-width: 280px;
+  min-width: 200px;
+  border-radius: 999px;
+  /* Inherit color from parent (.bubbleUser / .bubbleCoach). */
 }
 
 .playBtn {
@@ -46,6 +50,18 @@
 
 .playBtn svg {
   display: block;
+}
+
+/* The bubble context decides the player background — we use a soft
+ * tinted background so the audio block stands out from the chat area. */
+
+.bubbleUser .player {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.bubbleCoach .player {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
 }
 
 .waveform {
