@@ -12,10 +12,22 @@ PROVIDERS = {
     "openai": {"base_url": "https://api.openai.com/v1", "env_key": "OPENAI_API_KEY"},
     "anthropic": {"base_url": "https://api.anthropic.com/v1", "env_key": "ANTHROPIC_API_KEY"},
     "groq": {"base_url": "https://api.groq.com/openai/v1", "env_key": "GROQ_API_KEY"},
+    # OmniRoute is our local OpenAI-compatible gateway (running in Docker
+    # and exposed via cloudflared tunnel). No API key required — auth is
+    # handled by the gateway itself. The URL can be overridden via env var
+    # to point at a different instance.
+    "omniroute": {
+        "base_url": os.getenv("OMNIROUTE_BASE_URL", "http://localhost:8082/v1"),
+        "env_key": "OMNIROUTE_API_KEY",  # usually empty
+    },
 }
 
-# Default settings when none provided
-DEFAULT_SETTINGS = {"provider": "minimax", "model": "MiniMax-Text-01"}
+# Default settings when none provided.
+# OmniRoute is the default in this environment because it routes to the
+# best available free model without needing an API key. Demo-Combo has
+# strict quality checks that fail on free models — `auto/best-chat`
+# routes to whichever model is currently the best fit.
+DEFAULT_SETTINGS = {"provider": "omniroute", "model": "auto/best-chat"}
 
 
 SYSTEM_PROMPT = """You are COACH, a friendly English teacher chatting with a student on WhatsApp.
@@ -78,6 +90,12 @@ def parse_and_validate_reply(raw: str) -> dict:
             c["category"] = "general"
         if "error_type" not in c:
             c["error_type"] = "general"
+        if "severity" not in c:
+            # Default severity to "minor" when the LLM doesn't output
+            # it. Critical errors are tenses, articles, wrong word
+            # choices; minor are stylistic. Free LLMs often skip this
+            # field, so we always fill it in here.
+            c["severity"] = "minor"
     return data
 
 
@@ -92,7 +110,7 @@ def _mock_reply(level: str, history: list[dict]) -> dict:
     text = last_user.lower()
     corrections = []
 
-    def add(orig, fixed, expl, lvl, err_type="grammar"):
+    def add(orig, fixed, expl, lvl, err_type="grammar", severity="minor"):
         if orig != fixed:
             corrections.append({
                 "original_phrase": orig,
@@ -101,6 +119,7 @@ def _mock_reply(level: str, history: list[dict]) -> dict:
                 "error_level": lvl,
                 "category": err_type,
                 "error_type": err_type,
+                "severity": severity,
             })
 
     # Case-insensitive patterns so "I Goed" / "I GOED" all match
@@ -184,25 +203,40 @@ def call_llm(messages: list[dict], settings: dict) -> str:
     base_url = config["base_url"]
     api_key = os.getenv(env_key, "")
 
-    if not api_key:
+    # OmniRoute does not require an API key — skip the env check.
+    if provider != "omniroute" and not api_key:
         raise LLMError(f"{env_key} not set")
 
-    # OpenAI-compatible providers (openai, groq)
-    if provider in ("openai", "groq"):
+    # OpenAI-compatible providers (openai, groq, omniroute)
+    if provider in ("openai", "groq", "omniroute"):
         payload = {
             "model": model or "gpt-4o-mini",
             "messages": messages,
             "temperature": 0.7,
+            # OmniRoute + most combos expect JSON; ask for it explicitly
+            # so the model returns parseable content for the COACH reply.
+            "response_format": {"type": "json_object"},
         }
         headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {api_key or 'no-key'}",
             "Content-Type": "application/json",
+            # Force non-streaming JSON response — some gateways (like
+            # OmniRoute) default to SSE unless we ask for plain JSON.
+            "Accept": "application/json",
         }
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=60.0) as client:
             resp = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
             if resp.status_code != 200:
-                raise LLMError(f"{provider} API returned {resp.status_code}: {resp.text}")
-            result = resp.json()
+                raise LLMError(f"{provider} API returned {resp.status_code}: {resp.text[:300]}")
+            # Defensive parsing — strip any leading "data: " prefixes
+            # from SSE that some gateways leak through.
+            text = resp.text
+            if text.startswith("data:"):
+                # SSE format — take last complete JSON chunk
+                chunks = [c[len("data:"):].strip() for c in text.split("\n\n") if c.startswith("data:")]
+                last = [c for c in chunks if c and c != "[DONE]"]
+                text = last[-1] if last else text
+            result = json.loads(text)
             return result["choices"][0]["message"]["content"]
 
     # Anthropic
