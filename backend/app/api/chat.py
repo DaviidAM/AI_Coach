@@ -13,8 +13,10 @@ from app.api.corrections import store_corrections
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# Files written here are served at /static/audio/...  (server runs from backend/ dir)
-AUDIO_DIR = Path("static/audio")
+# Files written here are served at /static/audio/...
+# Path is anchored to this file's directory (app/api/), so it matches
+# the static dir mounted by app/main.py (app/static/).
+AUDIO_DIR = Path(__file__).parent.parent / "static" / "audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 STT_DIR = AUDIO_DIR / "stt"
 STT_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,7 +72,13 @@ async def chat(
 
     else:
         user_text = text
-        user_audio_url = None
+        # Spec: regardless of text/audio input, generate TTS for the user's
+        # message so the user can hear it played back AND the COACH's audio
+        # has uniform context. Saves to /static/audio/<uuid>.mp3.
+        user_uuid = uuid.uuid4()
+        user_audio_path = AUDIO_DIR / f"{user_uuid}.mp3"
+        await synthesize(user_text or "", user_audio_path)
+        user_audio_url = f"/static/audio/{user_uuid}.mp3"
 
     # Get user level
     level = store.get_level(session_id)
