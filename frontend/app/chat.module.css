@@ -111,17 +111,9 @@
   max-width: 85%;
   min-width: 0;
   animation: messageIn 0.2s ease-out;
-}
-
-@keyframes messageIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  /* Both the text bubble and the audio block need to align to the
+   * same side as the speaker. Since each .message is its own flex
+   * container, we align the children based on role. */
 }
 
 .messageUser {
@@ -135,8 +127,9 @@
 }
 
 .bubble {
-  /* Single card: text + audio + meta inside */
-  padding: 0.5rem 0.75rem 0.375rem;
+  /* Text-only card. The audio lives in a separate block (.bubbleAudio)
+   * below, so this card needs no internal audio styling. */
+  padding: 0.625rem 0.875rem 0.5rem;
   border-radius: 18px;
   font-size: 0.9375rem;
   line-height: 1.4;
@@ -146,7 +139,6 @@
   box-shadow: var(--shadow-sm);
   min-width: 0;
   max-width: 100%;
-  /* WhatsApp uses a tight bubble — fit the content */
   width: fit-content;
 }
 
@@ -193,28 +185,22 @@
   30% { opacity: 1; }
 }
 
+/* =============================================================================
+ * Audio block — separate from the text bubble
+ *
+ * Each audio lives in its OWN card below the text bubble. It needs room to
+ * breathe (play button + waveform + label/duration), so we give it a minimum
+ * width and align it to the same side as the text (user = right, coach = left).
+ * ============================================================================= */
+
 .bubbleAudio {
-  /* Audio player lives inside the bubble, below the text.
-   * Negative horizontal margins extend the player to bleed past the
-   * bubble's content padding so it touches the bubble edges.
-   * The audio player itself fills 100% of this expanded container. */
-  margin-top: 0.5rem;
-  margin-left: -0.75rem;
-  margin-right: -0.75rem;
-  margin-bottom: -0.375rem;
-  padding: 0.375rem 0.75rem;
-  border-bottom-left-radius: inherit;
-  border-bottom-right-radius: inherit;
-  /* Subtle separator from the text above */
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.bubbleUser .bubbleAudio {
-  border-top-color: rgba(255, 255, 255, 0.18);
-}
-
-.bubbleCoach .bubbleAudio {
-  border-top-color: var(--border-color);
+  margin-top: 0.375rem;
+  display: flex;
+  width: fit-content;
+  /* Don't let flexbox shrink it — the waveform needs a minimum size */
+  flex-shrink: 0;
+  /* Hide entirely if there's no audio (the JSX renders nothing, but
+   * be defensive in case CSS leaks). */
 }
 
 .bubbleAudio:empty {
