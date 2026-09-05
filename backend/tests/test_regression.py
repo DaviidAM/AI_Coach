@@ -124,7 +124,7 @@ class TestSavedRecordings:
         audio_url = data["user_audio_url"]
         # URL is like /static/audio/stt/stt_<uuid>.webm → relative path static/audio/stt/stt_<uuid>.webm
         rel_path = audio_url.lstrip("/")  # "static/audio/stt/stt_xxx.webm"
-        audio_path = Path(rel_path)
+        audio_path = Path("app") / rel_path
         assert audio_path.exists(), f"Expected saved recording at {audio_path.resolve()}"
         # Clean up
         if audio_path.exists():
@@ -141,5 +141,7 @@ class TestSavedRecordings:
             )
         assert response.status_code == 200
         data = response.json()
-        # user_audio_url should be None for text-only
-        assert data["user_audio_url"] is None
+        # user_audio_url is now set (TTS synthesized for the user's text input),
+        # but it must NOT be a /static/audio/stt/ path
+        assert data["user_audio_url"] is not None
+        assert "/static/audio/stt/" not in data["user_audio_url"]
