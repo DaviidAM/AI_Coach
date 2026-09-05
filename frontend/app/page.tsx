@@ -248,7 +248,9 @@ export default function Home() {
                   )}
 
                   {!m.pending && m.user_audio_url && (
-                    <div className={styles.bubbleAudio}>
+                    <div
+                      className={`${styles.bubbleAudio} ${styles.bubbleUser}`}
+                    >
                       <AudioPlayer
                         src={audioUrl(m.user_audio_url) || m.user_audio_url}
                         variant="user"
@@ -256,7 +258,9 @@ export default function Home() {
                     </div>
                   )}
                   {!m.pending && m.coach_audio_url && (
-                    <div className={styles.bubbleAudio}>
+                    <div
+                      className={`${styles.bubbleAudio} ${styles.bubbleCoach}`}
+                    >
                       <AudioPlayer
                         src={audioUrl(m.coach_audio_url) || m.coach_audio_url}
                         variant="coach"

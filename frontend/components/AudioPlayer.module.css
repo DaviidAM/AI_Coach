@@ -1,17 +1,13 @@
 /* WhatsApp-style audio player.
- * Now lives as its own BLOCK below the text bubble (not inside it), so
- * it has a minimum width to give the waveform room to breathe. */
+ * Lives INSIDE its own audio bubble (.bubbleAudio) which provides the
+ * background tint and border — the player itself is layout-only. */
 
 .player {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.625rem;
-  /* Match the bubble's max width so we never exceed it */
-  max-width: 280px;
-  min-width: 200px;
-  border-radius: 999px;
-  /* Inherit color from parent (.bubbleUser / .bubbleCoach). */
+  width: 100%;
+  min-width: 0;
 }
 
 .playBtn {
@@ -25,17 +21,14 @@
   border: none;
   cursor: pointer;
   transition: transform 0.1s ease, background 0.15s ease, opacity 0.15s ease;
-  /* Contrast against the parent bubble */
 }
 
-.player :global(.messageUser) .playBtn,
-.messageUser .playBtn,
-.bubbleUser .playBtn {
-  background: rgba(255, 255, 255, 0.22);
+.bubbleAudio.bubbleUser .playBtn {
+  background: var(--accent-indigo);
   color: #fff;
 }
 
-.bubbleCoach .playBtn {
+.bubbleAudio.bubbleCoach .playBtn {
   background: var(--accent-indigo);
   color: #fff;
 }
@@ -50,18 +43,6 @@
 
 .playBtn svg {
   display: block;
-}
-
-/* The bubble context decides the player background — we use a soft
- * tinted background so the audio block stands out from the chat area. */
-
-.bubbleUser .player {
-  background: rgba(99, 102, 241, 0.18);
-}
-
-.bubbleCoach .player {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
 }
 
 .waveform {
@@ -79,19 +60,12 @@
   min-height: 4px;
   max-height: 22px;
   border-radius: 999px;
-  /* Color follows the bubble context via parent .messageUser / .messageCoach */
+  /* The bars follow the indigo accent — visible on both light and
+   * dark bubble backgrounds. */
+  background: var(--accent-indigo);
+  opacity: 0.45;
   transition: opacity 0.15s ease, transform 0.15s ease;
   transform-origin: center;
-}
-
-.bubbleUser .bar {
-  background: #fff;
-  opacity: 0.4;
-}
-
-.bubbleCoach .bar {
-  background: var(--accent-indigo);
-  opacity: 0.35;
 }
 
 .barFilled {
@@ -124,7 +98,7 @@
 
 .bubbleUser .label,
 .bubbleUser .duration {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--accent-indigo);
 }
 
 .bubbleCoach .label,
