@@ -100,12 +100,12 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
   return (
     <nav className={styles.topbar}>
       <div className={styles.left}>
-        <span className={styles.logo} aria-hidden="true">🎯</span>
-        <span className={styles.brand}>AI Coach</span>
+        <span className={styles.logo} aria-hidden="true">🤖</span>
+        <span className={styles.brand}>English AI Coach</span>
       </div>
 
       <div className={styles.center}>
-        <span className={styles.lang}>English · voice & text</span>
+        <span className={styles.lang}>Demo Version</span>
       </div>
 
       <div className={styles.right}>
