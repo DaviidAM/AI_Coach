@@ -1,0 +1,578 @@
+/* =============================================================================
+ * AI Coach — chat layout
+ *
+ * Layout model:
+ *   .chatPage (full viewport, column)
+ *     ├── .topbarZone (sticky)
+ *     ├── .chatMain (flex 1, scrolling messages)
+ *     │     └── .bubble.card (each message is one card)
+ *     │           ├── .bubbleText (text)
+ *     │           ├── .bubbleAudio (WhatsApp-style player, INSIDE the card)
+ *     │           └── .bubbleMeta  (timestamp + pending indicator)
+ *     ├── .correctionsPanel (live, scrollable, fixed-height)
+ *     └── .inputArea (sticky, textarea + send/mic)
+ *
+ * WhatsApp design rules followed:
+ *   - Bubble hugs its content
+ *   - Text + audio inside the SAME bubble (no separate row below)
+ *   - Audio bubble shape: square top-left/bottom-right, rounded on the
+ *     corner pointing AWAY from the speaker side
+ * ============================================================================= */
+
+.chatPage {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh; /* dynamic viewport = handles iOS Safari URL bar */
+  background-color: var(--bg-primary);
+  /* Subtle dotted background, like WhatsApp dark mode */
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+}
+
+/* --- Topbar zone: sticky, doesn't scroll away --------------------------- */
+.topbarZone {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* --- Main scroll area --------------------------------------------------- */
+.chatMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 0;
+}
+
+.messagesArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  /* Smooth momentum scroll on iOS */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 2rem 1.5rem;
+  gap: 0.5rem;
+}
+
+.emptyEmoji {
+  font-size: 3.5rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.7;
+}
+
+.emptyTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.emptyHint {
+  font-size: 0.8125rem;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+ * Message bubbles — WhatsApp style
+ * Each message is a .message wrapper that aligns itself left/right, and
+ * inside sits a single .bubble card containing text + (optional) audio + meta.
+ * ============================================================================= */
+
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+  min-width: 0;
+  animation: messageIn 0.2s ease-out;
+  /* Both the text bubble and the audio block need to align to the
+   * same side as the speaker. Since each .message is its own flex
+   * container, we align the children based on role. */
+}
+
+.messageUser {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.messageCoach {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.bubble {
+  /* Text-only card. The audio lives in a separate block (.bubbleAudio)
+   * below, so this card needs no internal audio styling. */
+  padding: 0.625rem 0.875rem 0.5rem;
+  border-radius: 18px;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: anywhere; /* break long URLs/words */
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  max-width: 100%;
+  width: fit-content;
+}
+
+.bubbleUser {
+  background: var(--accent-indigo);
+  color: var(--text-on-accent);
+  border-bottom-right-radius:6px;
+}
+
+.bubbleCoach {
+  background: var(--bg-message-coach);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-bottom-left-radius: 6px;
+}
+
+.bubbleText {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-right: 3.5rem; /* room for the timestamp at bottom-right */
+}
+
+.bubbleText:empty {
+  display: none;
+}
+
+.bubbleCoach[data-pending='true'] .bubbleText {
+  opacity: 0.7;
+}
+
+.bubbleCoach[data-pending='true'] .bubbleText::after {
+  content: '●●●';
+  display: inline-block;
+  margin-left: 0.25rem;
+  font-size: 0.5rem;
+  letter-spacing: 2px;
+  color: var(--accent-indigo);
+  animation: typing 1.2s infinite;
+  vertical-align: middle;
+}
+
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.3; }
+  30% { opacity: 1; }
+}
+
+/* =============================================================================
+ * Audio block — its own bubble below the text bubble
+ *
+ * Each audio lives in its OWN bubble (separate from the text bubble).
+ * Same visual language as the text bubble so they look like siblings:
+ *   - same border-radius
+ *   - same background tint per speaker
+ *   - own padding so the waveform has breathing room
+ *   - aligned to the same side as the text bubble
+ * ============================================================================= */
+
+.bubbleAudio {
+  /* Independent audio bubble — NOT a child of .bubble */
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  /* Slightly tighter padding than text bubble (audio bubble is shorter) */
+  padding: 0.4375rem 0.625rem;
+  border-radius: 18px;
+  min-width: 200px;
+  max-width: 280px;
+  flex-shrink: 0;
+  /* Match the bubble's drop shadow so the two bubbles feel consistent */
+  box-shadow: var(--shadow-sm);
+}
+
+.bubbleAudio:empty {
+  display: none;
+}
+
+.bubbleAudio.bubbleUser {
+  /* Match the coach audio bubble exactly — same dark surface, same
+   * indigo play button, indigo waveform. This keeps the audio cards
+   * visually consistent regardless of speaker, so the user audio
+   * doesn't look like a "highlight" against its own indigo text bubble.
+   */
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-bottom-right-radius: 6px;
+}
+
+.bubbleAudio.bubbleCoach {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-bottom-left-radius: 6px;
+}
+
+.bubbleMeta {
+  position: absolute;
+  bottom: 0.3rem;
+  right: 0.625rem;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+.bubbleUser .bubbleMeta {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.bubbleCoach .bubbleMeta {
+  color: var(--text-muted);
+}
+
+.timestamp {
+  font-size: 0.6875rem;
+  letter-spacing: 0.01em;
+}
+
+.pendingDot {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-right: 0.25rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+  animation: pulse 1.2s infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.9; }
+}
+
+/* =============================================================================
+ * Live corrections panel — between messages and input
+ * ============================================================================= */
+
+.correctionsPanel {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  padding: 0.75rem 1rem;
+  max-height: 32vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.correctionsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.correctionsTitle {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.correctionsLevel {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.correctionsEmpty {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.5rem 0;
+  font-style: italic;
+}
+
+.correctionCard {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 8px;
+  padding: 0.5rem 0.625rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.correctionCard:last-child {
+  margin-bottom: 0;
+}
+
+.correctionRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.correctionOriginal {
+  text-decoration: line-through;
+  color: var(--accent-danger);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+.correctionArrow {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.correctionFixed {
+  color: var(--accent-cyan);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.correctionLevel {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: var(--accent-indigo);
+  color: var(--text-on-accent);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.correctionExplanation {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* =============================================================================
+ * Input row — sticky at the bottom
+ * ============================================================================= */
+
+.inputArea {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  padding: 0.625rem 0.875rem;
+  flex-shrink: 0;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 0.25rem 0.25rem 0.25rem 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inputWrapper:focus-within {
+  border-color: var(--accent-indigo);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.textInput {
+  flex: 1;
+  resize: none;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  padding: 0.5rem 0;
+  max-height: 140px;
+  min-height: 24px;
+  background: transparent;
+  border: none;
+}
+
+.textInput::placeholder {
+  color: var(--text-muted);
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.1s ease;
+  color: var(--text-secondary);
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.sendBtn {
+  background: var(--accent-indigo);
+  color: var(--text-on-accent);
+}
+
+.sendBtn:hover:not(:disabled) {
+  background: var(--accent-indigo-hover);
+  transform: scale(1.05);
+}
+
+.micBtn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.micBtn[data-recording='true'] {
+  background: var(--accent-danger);
+  color: var(--text-on-accent);
+  animation: pulseRed 1.4s infinite;
+}
+
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}
+
+.resetRow {
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.resetBtn {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+
+.resetBtn:hover:not(:disabled) {
+  color: var(--text-secondary);
+}
+
+/* =============================================================================
+ * Error banner
+ * ============================================================================= */
+
+.errorBanner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--accent-danger);
+  color: var(--accent-danger);
+  padding: 0.625rem 0.875rem;
+  border-radius: 8px;
+  margin: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.errorBanner button {
+  color: var(--accent-danger);
+  text-decoration: underline;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* =============================================================================
+ * Responsive — mobile-first adjustments
+ * ============================================================================= */
+
+@media (max-width: 640px) {
+  .messagesArea {
+    padding: 0.75rem 0.625rem 0.5rem;
+  }
+  .message {
+    max-width: 92%;
+  }
+  .bubble {
+    border-radius: 16px;
+  }
+  .bubbleUser {
+    border-bottom-right-radius: 5px;
+  }
+  .bubbleCoach {
+    border-bottom-left-radius: 5px;
+  }
+  .correctionsPanel {
+    padding: 0.625rem 0.75rem;
+    max-height: 28vh;
+  }
+  .inputArea {
+    padding: 0.5rem 0.625rem;
+    /* Account for iOS safe-area home indicator */
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .bubbleText {
+    padding-right: 3rem;
+  }
+}
+
+@media (max-width: 380px) {
+  /* Very narrow phones — be more compact */
+  .message {
+    max-width: 96%;
+  }
+  .bubble {
+    padding: 0.4375rem 0.625rem 0.3125rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* =============================================================================
+ * Reduced motion
+ * ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble,
+  .playBtn,
+  .iconBtn,
+  .waveform,
+  .pendingDot,
+  .micBtn,
+  .inputWrapper {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

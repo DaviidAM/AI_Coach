@@ -1,0 +1,318 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  gap: 1rem;
+  min-height: 56px;
+  flex-wrap: wrap;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.center {
+  display: flex;
+  align-items: center;
+}
+
+.lang {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.levelLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.chip {
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.chip:hover {
+  border-color: var(--accent-indigo);
+  color: var(--text-primary);
+}
+
+.chipActive {
+  background-color: var(--chip-active-bg);
+  border-color: var(--chip-active-bg);
+  color: var(--chip-active-text);
+}
+
+.chipActive:hover {
+  background-color: var(--accent-indigo-hover);
+  border-color: var(--accent-indigo-hover);
+  color: var(--chip-active-text);
+}
+
+.dropdown {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.15s, border-color 0.15s;
+  padding: 0;
+}
+
+.themeToggle:hover {
+  border-color: var(--accent-indigo);
+  background-color: var(--bg-tertiary);
+}
+
+@media (max-width: 479px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .center {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .lang {
+    font-size: 0.75rem;
+  }
+}
+
+.errorsButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.1s ease;
+  white-space: nowrap;
+}
+
+.errorsButton:hover {
+  border-color: var(--accent-cyan);
+  background-color: var(--bg-tertiary);
+}
+
+.errorsButton:active {
+  transform: scale(0.96);
+}
+
+.errorsButton:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.errorsButtonLabel {
+  /* Inherit colour from button; rely on the font-weight for emphasis */
+}
+
+.errorsBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-danger, #ef4444);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* =============================================================================
+ * Collapsible level selector (replaces the old 6-chip group on desktop)
+ * Single button shows the current level + caret; click reveals a dropdown
+ * panel listing all 6 CEFR levels. Outside-click and Escape close it.
+ * ============================================================================= */
+.levelSelector {
+  position: relative;
+  display: inline-block;
+}
+
+.levelSelectorBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.levelSelectorBtn:hover {
+  border-color: var(--accent-cyan);
+  background-color: var(--bg-tertiary);
+}
+
+.levelSelectorBtn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.levelValue {
+  color: var(--accent-cyan);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  min-width: 2.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.levelCaret {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+  display: inline-block;
+}
+
+.levelCaretOpen {
+  transform: rotate(180deg);
+}
+
+.levelMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  animation: levelMenuIn 0.12s ease-out;
+}
+
+@keyframes levelMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.levelMenu li {
+  list-style: none;
+}
+
+.levelMenuItem,
+.levelMenuItemActive {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.levelMenuItem:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.levelMenuItemActive {
+  background-color: var(--accent-indigo);
+  color: #fff;
+  font-weight: 600;
+}
+
+.levelMenuItemActive:hover {
+  background-color: var(--accent-indigo);
+}
+
+.levelMenuLevel {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  min-width: 2.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.levelMenuName {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
