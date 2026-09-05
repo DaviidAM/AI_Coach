@@ -174,10 +174,10 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
         <button
           className={styles.errorsButton}
           onClick={onOpenErrors}
-          aria-label="View error history"
-          title="Error history"
+          aria-label="View all corrections"
+          title="View all corrections"
         >
-          <span aria-hidden="true">📋</span>
+          <span className={styles.errorsButtonLabel}>All Corrections</span>
           {errorCount > 0 && <span className={styles.errorsBadge}>{errorCount}</span>}
         </button>
 
