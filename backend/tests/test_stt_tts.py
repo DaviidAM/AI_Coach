@@ -218,7 +218,7 @@ class TestChatAudioResponse:
         self.mock_get_llm_reply.return_value = {
             "reply": "Hi! How can I help you?",
             "corrections": [],
-        }
+        }, None
 
         yield
 
@@ -297,7 +297,7 @@ class TestChatAudioValidation:
         self.mock_synthesize = patch("app.api.chat.synthesize").start()
         self.mock_get_llm_reply = patch("app.api.chat.get_llm_reply").start()
         self.mock_transcribe.return_value = "Hello"
-        self.mock_get_llm_reply.return_value = {"reply": "Hi!", "corrections": []}
+        self.mock_get_llm_reply.return_value = {"reply": "Hi!", "corrections": []}, None
         yield
         patch.stopall()
 
@@ -342,7 +342,7 @@ class TestSTTValidation:
         self.mock_synthesize = patch("app.api.chat.synthesize").start()
         self.mock_get_llm_reply = patch("app.api.chat.get_llm_reply").start()
         self.mock_transcribe.return_value = "transcribed text"
-        self.mock_get_llm_reply.return_value = {"reply": "coach reply", "corrections": []}
+        self.mock_get_llm_reply.return_value = {"reply": "coach reply", "corrections": []}, None
         yield
         patch.stopall()
 
@@ -391,7 +391,7 @@ class TestTTSPath:
         self.mock_transcribe = patch("app.api.chat.transcribe").start()
         self.mock_get_llm_reply = patch("app.api.chat.get_llm_reply").start()
         self.mock_transcribe.return_value = "Hello"
-        self.mock_get_llm_reply.return_value = {"reply": "Coach reply", "corrections": []}
+        self.mock_get_llm_reply.return_value = {"reply": "Coach reply", "corrections": []}, None
         yield
         patch.stopall()
         for f in self.audio_dir.glob("*.mp3"):
