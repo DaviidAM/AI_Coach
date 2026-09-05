@@ -68,38 +68,21 @@
  * of truth.
  * ============================================================================= */
 
-/* Bar colors: when this player sits inside a .chat_bubbleUser__* (light
- * bubble), the bars need to be indigo with reduced opacity for contrast.
- * For coach (dark bubble), indigo at higher opacity works on the
- * darker background.
- *
- * We use :global() selectors because .chat_bubbleUser__XXX is generated
- * by chat.module.css and may change hash; matching the literal CSS Module
- * suffix would be fragile. */
-:global([data-audio-bubble="user"]) .bar {
-  background: var(--accent-indigo);
-  opacity: 0.55;
-}
-
-:global([data-audio-bubble="user"]) .barFilled {
-  opacity: 1;
-}
-
+/* Bar + label colors: both bubbles now share the same dark surface,
+ * so the indigo waveform + text-secondary labels work on both. */
+:global([data-audio-bubble="user"]) .bar,
 :global([data-audio-bubble="coach"]) .bar {
   background: var(--accent-indigo);
   opacity: 0.45;
 }
 
+:global([data-audio-bubble="user"]) .barFilled,
 :global([data-audio-bubble="coach"]) .barFilled {
   opacity: 1;
 }
 
-/* Label + duration colors */
 :global([data-audio-bubble="user"]) .label,
-:global([data-audio-bubble="user"]) .duration {
-  color: var(--accent-indigo);
-}
-
+:global([data-audio-bubble="user"]) .duration,
 :global([data-audio-bubble="coach"]) .label,
 :global([data-audio-bubble="coach"]) .duration {
   color: var(--text-secondary);
@@ -129,19 +112,14 @@
   font-size: 0.6875rem;
 }
 
-/* Label and duration inherit color from the parent audio bubble.
- * User audio bubble is now light (off-white) → label/duration in
- *   indigo for contrast against the light bubble.
- * Coach audio bubble is neutral → label/duration in dark gray. */
+/* The audio bubble color comes from the data-audio-bubble attribute on
+ * the wrapper (see .bubbleAudio.bubbleUser / .bubbleCoach in
+ * chat.module.css) plus the [data-audio-bubble="..."] selectors below.
+ * Both bubbles share the same dark surface so we only need one rule. */
 
 .bubbleAudio .label,
 .bubbleAudio .duration {
-  color: var(--text-primary);
-}
-
-.bubbleAudio.bubbleUser .label,
-.bubbleAudio.bubbleUser .duration {
-  color: var(--accent-indigo);
+  color: var(--text-secondary);
 }
 
 .error {

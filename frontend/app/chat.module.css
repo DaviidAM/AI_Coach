@@ -216,17 +216,14 @@
 }
 
 .bubbleAudio.bubbleUser {
-  /* Light bubble so the indigo play button + indigo waveform bars
-   * contrast strongly. Slightly off-white so it reads as a separate
-   * card from the indigo text bubble above. */
-  background: #F3F4F6;
-  border: 1px solid rgba(99, 102, 241, 0.45);
+  /* Match the coach audio bubble exactly — same dark surface, same
+   * indigo play button, indigo waveform. This keeps the audio cards
+   * visually consistent regardless of speaker, so the user audio
+   * doesn't look like a "highlight" against its own indigo text bubble.
+   */
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-bottom-right-radius: 6px;
-}
-
-[data-theme='light'] .bubbleAudio.bubbleUser {
-  background: #FFFFFF;
-  border: 1px solid rgba(99, 102, 241, 0.5);
 }
 
 .bubbleAudio.bubbleCoach {
