@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
 from fastapi.responses import JSONResponse
 import uuid
 from pathlib import Path
@@ -22,7 +22,6 @@ STT_DIR = AUDIO_DIR / "stt"
 STT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# MIME type -> file extension mapping
 _MIME_EXT = {
     "audio/mpeg": "mp3",
     "audio/wav": "wav",
@@ -30,6 +29,18 @@ _MIME_EXT = {
     "audio/webm": "webm",
     "audio/mp4": "mp4",
 }
+
+
+# MIME type -> file extension mapping.
+# Browsers send audio/webm;codecs=opus or audio/ogg;codecs=opus — we strip
+# the codec suffix before matching.
+def _ext_for_mime(mime: str) -> str:
+    base = (mime or "").split(";", 1)[0].strip().lower()
+    return _MIME_EXT.get(base, "bin")
+
+
+# Allowed audio MIME types (base form, without codec suffix).
+_ALLOWED_AUDIO_MIMES = {"audio/mpeg", "audio/wav", "audio/ogg", "audio/webm", "audio/mp4"}
 
 
 @router.post("")
@@ -52,16 +63,20 @@ async def chat(
     user_audio_url: str | None = None
 
     if has_audio:
-        # Validate MIME type
-        if audio.content_type not in ("audio/mpeg", "audio/wav", "audio/ogg", "audio/webm", "audio/mp4"):
-            raise HTTPException(status_code=422, detail=f"Unsupported audio MIME type: {audio.content_type}")
+        # Validate MIME type (strip codec suffix, e.g. "audio/webm;codecs=opus")
+        base_mime = (audio.content_type or "").split(";", 1)[0].strip().lower()
+        if base_mime not in _ALLOWED_AUDIO_MIMES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unsupported audio MIME type: {audio.content_type}",
+            )
 
         # Read audio bytes
         audio_bytes = await audio.read()
 
         # Save the original user recording to disk (cherry-pick from old Gradio code)
         user_uuid = uuid.uuid4()
-        ext = _MIME_EXT.get(audio.content_type, "bin")
+        ext = _ext_for_mime(audio.content_type)
         saved_path = STT_DIR / f"stt_{user_uuid}.{ext}"
         with open(saved_path, "wb") as f:
             f.write(audio_bytes)
@@ -90,9 +105,12 @@ async def chat(
     # Get history for LLM
     history = store.get_history_for_llm(session_id)
 
+    # Get LLM settings for this session
+    settings = store.get_settings(session_id)
+
     # Call LLM
     try:
-        llm_result = get_llm_reply(level, history)
+        llm_result, fallback_reason = get_llm_reply(level, history, settings)
     except LLMError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -117,11 +135,16 @@ async def chat(
         raise HTTPException(status_code=502, detail=f"TTS synthesis failed: {e}") from None
     coach_audio_url = f"/static/audio/{coach_uuid}.mp3"
 
-    return ChatResponse(
-        session_id=session_id,
-        user_text=user_text,
-        user_audio_url=user_audio_url,
-        coach_text=coach_text,
-        coach_audio_url=coach_audio_url,
-        corrections=[Correction(**c) for c in filtered],
-    )
+    response_data = {
+        "session_id": session_id,
+        "user_text": user_text,
+        "user_audio_url": user_audio_url,
+        "coach_text": coach_text,
+        "coach_audio_url": coach_audio_url,
+        "corrections": [Correction(**c).model_dump() for c in filtered],
+    }
+
+    if fallback_reason:
+        return JSONResponse(content=response_data, headers={"X-Fallback": fallback_reason})
+
+    return ChatResponse(**response_data)

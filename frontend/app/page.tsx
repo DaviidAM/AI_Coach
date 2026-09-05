@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Topbar } from '@/components/Topbar'
+import { AudioPlayer } from '@/components/AudioPlayer'
 import {
   ChatMessage,
   audioUrl,
@@ -11,7 +12,6 @@ import {
 } from '@/lib/api'
 import styles from './chat.module.css'
 
-const AUDIO_PLAYED_KEY = 'ai-coach-last-audio'
 const SESSION_KEY = 'ai-coach-session-id'
 
 function getStoredSessionId(): string {
@@ -31,12 +31,10 @@ export default function Home() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
-  const [playingAudio, setPlayingAudio] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     setSessionId(getStoredSessionId())
@@ -46,61 +44,18 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  useEffect(() => {
-    return () => {
-      audioRef.current?.pause()
-    }
-  }, [])
-
   function appendMessage(msg: ChatMessage) {
     setMessages((prev) => [...prev, msg])
   }
 
-  function updateLastMessage(updater: Partial<ChatMessage>) {
+  function updateMessageAt(index: number, updater: Partial<ChatMessage>) {
     setMessages((prev) => {
-      if (prev.length === 0) return prev
       const next = [...prev]
-      next[next.length - 1] = { ...next[next.length - 1], ...updater }
+      if (index < 0 || index >= next.length) return prev
+      next[index] = { ...next[index], ...updater }
       return next
     })
   }
-
-  async function playAudio(url: string) {
-    if (!url) return
-    try {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-      const fullUrl = audioUrl(url) || url
-      const audio = new Audio(fullUrl)
-      audioRef.current = audio
-      setPlayingAudio(url)
-      audio.onended = () => setPlayingAudio(null)
-      audio.onerror = () => setPlayingAudio(null)
-      await audio.play()
-    } catch (err) {
-      console.warn('Audio playback failed', err)
-      setPlayingAudio(null)
-    }
-  }
-
-  // Auto-play coach audio when a new message arrives with coach_audio_url
-  useEffect(() => {
-    const last = messages[messages.length - 1]
-    if (!last || last.role !== 'coach' || !last.coach_audio_url) return
-    if (last.pending) return
-    if (!sessionId) return
-    const key = `${sessionId}:${last.coach_audio_url}`
-    try {
-      if (sessionStorage.getItem(AUDIO_PLAYED_KEY) === key) return
-      sessionStorage.setItem(AUDIO_PLAYED_KEY, key)
-      playAudio(last.coach_audio_url)
-    } catch {
-      playAudio(last.coach_audio_url)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, sessionId])
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim()
@@ -125,10 +80,14 @@ export default function Home() {
 
     try {
       const res = await sendText(text, sessionId)
-      updateLastMessage({
+      // user_audio_url is on the user message (was returned for text too)
+      updateMessageAt(messages.length, {
+        user_audio_url: res.user_audio_url,
+      })
+      // coach message is the last one
+      updateMessageAt(messages.length + 1, {
         text: res.coach_text,
         coach_audio_url: res.coach_audio_url,
-        user_audio_url: res.user_audio_url,
         corrections: res.corrections,
         pending: false,
       })
@@ -144,26 +103,39 @@ export default function Home() {
   async function startRecording() {
     if (busy || !sessionId) return
     setError(null)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Microphone API not available in this browser.')
+      return
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setError('MediaRecorder not supported in this browser.')
+      return
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mr = new MediaRecorder(stream)
       mediaRecorderRef.current = mr
       chunksRef.current = []
       mr.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
       }
       mr.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
-        const blob = new Blob(chunksRef.current, {
-          type: chunksRef.current[0]?.type || 'audio/webm',
-        })
+        // Determine a sensible mime — fall back to webm if MediaRecorder
+        // produced something exotic that the backend doesn't support.
+        const producedType = chunksRef.current[0]?.type || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: producedType })
         await submitAudio(blob)
       }
       mr.start()
       setRecording(true)
     } catch (err: any) {
       console.error('mic error', err)
-      setError('Microphone unavailable. Check browser permissions.')
+      const msg =
+        err?.name === 'NotAllowedError'
+          ? 'Microphone permission denied. Allow access in the browser.'
+          : 'Microphone unavailable. Check browser permissions.'
+      setError(msg)
     }
   }
 
@@ -191,30 +163,22 @@ export default function Home() {
     }
     appendMessage(placeholderUser)
     appendMessage(placeholderCoach)
+
+    const userIdx = messages.length
+    const coachIdx = messages.length + 1
+
     try {
       const res = await sendAudio(blob, sessionId)
-      setMessages((prev) => {
-        const next = [...prev]
-        const userIdx = next.length - 2
-        const coachIdx = next.length - 1
-        if (userIdx >= 0 && next[userIdx].pending && next[userIdx].role === 'user') {
-          next[userIdx] = {
-            ...next[userIdx],
-            text: res.user_text,
-            user_audio_url: res.user_audio_url,
-            pending: false,
-          }
-        }
-        if (coachIdx >= 0) {
-          next[coachIdx] = {
-            ...next[coachIdx],
-            text: res.coach_text,
-            coach_audio_url: res.coach_audio_url,
-            corrections: res.corrections,
-            pending: false,
-          }
-        }
-        return next
+      updateMessageAt(userIdx, {
+        text: res.user_text,
+        user_audio_url: res.user_audio_url,
+        pending: false,
+      })
+      updateMessageAt(coachIdx, {
+        text: res.coach_text,
+        coach_audio_url: res.coach_audio_url,
+        corrections: res.corrections,
+        pending: false,
       })
     } catch (err: any) {
       console.error('audio submit error', err)
@@ -277,29 +241,27 @@ export default function Home() {
                 >
                   {m.text}
                 </div>
+
+                {/* Audio player belongs to THIS message — under the user's bubble
+                    for user audio, under the coach's bubble for coach audio. */}
+                {!m.pending && m.user_audio_url && (
+                  <div className={styles.audioRow}>
+                    <AudioPlayer
+                      src={audioUrl(m.user_audio_url) || m.user_audio_url}
+                      label={m.role === 'user' ? 'You' : 'You'}
+                    />
+                  </div>
+                )}
+                {!m.pending && m.coach_audio_url && (
+                  <div className={styles.audioRow}>
+                    <AudioPlayer
+                      src={audioUrl(m.coach_audio_url) || m.coach_audio_url}
+                      label="Coach"
+                    />
+                  </div>
+                )}
+
                 <div className={styles.metaRow}>
-                  {!m.pending && m.coach_audio_url && (
-                    <button
-                      className={`${styles.playBtn} ${
-                        playingAudio === m.coach_audio_url ? styles.playing : ''
-                      }`}
-                      onClick={() => playAudio(m.coach_audio_url!)}
-                      aria-label="Play coach reply audio"
-                    >
-                      {playingAudio === m.coach_audio_url ? '⏸' : '▶'} Coach audio
-                    </button>
-                  )}
-                  {!m.pending && m.user_audio_url && (
-                    <button
-                      className={`${styles.playBtn} ${
-                        playingAudio === m.user_audio_url ? styles.playing : ''
-                      }`}
-                      onClick={() => playAudio(m.user_audio_url!)}
-                      aria-label="Play your audio back"
-                    >
-                      {playingAudio === m.user_audio_url ? '⏸' : '▶'} Your audio
-                    </button>
-                  )}
                   <span className={styles.timestamp}>
                     {new Date(m.timestamp).toLocaleTimeString([], {
                       hour: '2-digit',
@@ -352,7 +314,7 @@ export default function Home() {
               className={styles.textInput}
               placeholder={
                 recording
-                  ? 'Recording...'
+                  ? '🔴 Recording... release to send'
                   : 'Type a message — Enter to send, Shift+Enter for newline'
               }
               value={input}
@@ -385,7 +347,7 @@ export default function Home() {
                 aria-label={recording ? 'Recording — release to send' : 'Hold to record audio'}
                 title="Hold to record audio"
               >
-                🎤
+                {recording ? '⏹' : '🎤'}
               </button>
             )}
           </div>

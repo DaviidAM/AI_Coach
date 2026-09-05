@@ -7,6 +7,16 @@ from typing import Any
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = "https://api.minimaxi.chat/v1"
 
+PROVIDERS = {
+    "minimax": {"base_url": "https://api.minimaxi.chat/v1", "env_key": "MINIMAX_API_KEY"},
+    "openai": {"base_url": "https://api.openai.com/v1", "env_key": "OPENAI_API_KEY"},
+    "anthropic": {"base_url": "https://api.anthropic.com/v1", "env_key": "ANTHROPIC_API_KEY"},
+    "groq": {"base_url": "https://api.groq.com/openai/v1", "env_key": "GROQ_API_KEY"},
+}
+
+# Default settings when none provided
+DEFAULT_SETTINGS = {"provider": "minimax", "model": "MiniMax-Text-01"}
+
 
 SYSTEM_PROMPT = """You are COACH, a friendly English teacher chatting with a student on WhatsApp.
 
@@ -158,19 +168,96 @@ def call_minimax(messages: list[dict], retry: bool = False) -> str:
         return content
 
 
-def get_llm_reply(level: str, history: list[dict]) -> dict:
-    # Read key at call time so tests can patch os.environ without reimporting.
-    if not os.getenv("MINIMAX_API_KEY"):
-        return _mock_reply(level, history)
+def call_llm(messages: list[dict], settings: dict) -> str:
+    """
+    Dispatch to the correct provider based on settings.provider.
+    Returns the raw content string from the LLM response.
+    """
+    provider = settings.get("provider", "minimax")
+    model = settings.get("model", "")
+
+    if provider not in PROVIDERS:
+        raise LLMError(f"Unknown provider: {provider}")
+
+    config = PROVIDERS[provider]
+    env_key = config["env_key"]
+    base_url = config["base_url"]
+    api_key = os.getenv(env_key, "")
+
+    if not api_key:
+        raise LLMError(f"{env_key} not set")
+
+    # OpenAI-compatible providers (openai, groq)
+    if provider in ("openai", "groq"):
+        payload = {
+            "model": model or "gpt-4o-mini",
+            "messages": messages,
+            "temperature": 0.7,
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+            if resp.status_code != 200:
+                raise LLMError(f"{provider} API returned {resp.status_code}: {resp.text}")
+            result = resp.json()
+            return result["choices"][0]["message"]["content"]
+
+    # Anthropic
+    if provider == "anthropic":
+        payload = {
+            "model": model or "claude-sonnet-4-20250514",
+            "messages": messages,
+            "max_tokens": 1024,
+        }
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(f"{base_url}/messages", headers=headers, json=payload)
+            if resp.status_code != 200:
+                raise LLMError(f"Anthropic API returned {resp.status_code}: {resp.text}")
+            result = resp.json()
+            return result["content"][0]["text"]
+
+    # minimax (default)
+    if provider == "minimax":
+        return call_minimax(messages)
+
+    raise LLMError(f"Unknown provider: {provider}")
+
+
+def get_llm_reply(level: str, history: list[dict], settings: dict | None = None) -> tuple[dict, str | None]:
+    """
+    Get LLM reply. Uses settings dict {provider, model} if provided,
+    otherwise defaults to DEFAULT_SETTINGS.
+    Returns (result_dict, fallback_reason). fallback_reason is non-None
+    when a mock fallback occurred (e.g. API key unset).
+    """
+    if settings is None:
+        settings = DEFAULT_SETTINGS.copy()
 
     messages = build_messages(level, history)
-    raw = call_minimax(messages)
+    fallback_reason: str | None = None
+
     try:
-        return parse_and_validate_reply(raw)
+        raw = call_llm(messages, settings)
+    except LLMError as e:
+        # Fall back to mock when API key is missing; capture the reason
+        fallback_reason = str(e)
+        return _mock_reply(level, history), fallback_reason
+
+    try:
+        return parse_and_validate_reply(raw), None
     except (json.JSONDecodeError, ValueError):
         try:
-            raw = call_minimax(messages, retry=True)
-            return parse_and_validate_reply(raw)
+            # Retry once
+            raw = call_llm(messages, settings)
+            return parse_and_validate_reply(raw), None
         except Exception as e:
             raise LLMError(f"LLM returned malformed JSON after retry: {raw[:200]}") from e
 
@@ -196,7 +283,7 @@ def summarize_conversation(level: str, history: list[dict]) -> str:
         {"role": "user", "content": f"Summarize this conversation:\n{history_text}"},
     ]
     try:
-        result = get_llm_reply(level, messages)
+        result, _ = get_llm_reply(level, messages)
         return result.get("reply", "Unable to generate summary.")
     except LLMError:
         return "Unable to generate summary."

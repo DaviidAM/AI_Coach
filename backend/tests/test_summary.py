@@ -11,7 +11,7 @@ class TestSummaryEndpoint:
     def test_summary_empty_history_returns_placeholder(self):
         """When there is no conversation history, summary returns a placeholder."""
         with patch("app.llm.get_llm_reply") as mock_llm:
-            mock_llm.return_value = {"reply": "Anything", "corrections": []}
+            mock_llm.return_value = {"reply": "Anything", "corrections": []}, None
             # Use a fresh session_id that has no history
             response = client.get("/api/conversation/summary?session_id=no-such-session")
             assert response.status_code == 200
@@ -32,7 +32,7 @@ class TestSummaryEndpoint:
             {"role": "assistant", "content": "Hi there! How are you?"},
         ]
         with patch("app.llm.get_llm_reply") as mock:
-            mock.return_value = {"reply": "The conversation covered greetings.", "corrections": []}
+            mock.return_value = {"reply": "The conversation covered greetings.", "corrections": []}, None
             result = summarize_conversation("B1", history)
             assert result == "The conversation covered greetings."
             mock.assert_called_once()

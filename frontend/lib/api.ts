@@ -31,6 +31,11 @@ export interface ChatResponse {
   corrections: Correction[]
 }
 
+export interface Settings {
+  provider: 'minimax' | 'openai' | 'anthropic' | 'groq'
+  model: string
+}
+
 export async function getLevel(sessionId?: string): Promise<Level> {
   const url = sessionId
     ? `${API_BASE}/api/level?session_id=${encodeURIComponent(sessionId)}`
@@ -70,7 +75,9 @@ export async function sendText(text: string, sessionId?: string): Promise<ChatRe
 
 export async function sendAudio(audioBlob: Blob, sessionId?: string): Promise<ChatResponse> {
   const form = new FormData()
-  form.append('audio', audioBlob, 'recording.webm')
+  // Backend accepts: audio/mpeg, audio/wav, audio/ogg, audio/webm, audio/mp4
+  const ext = guessExtension(audioBlob.type)
+  form.append('audio', audioBlob, `recording.${ext}`)
   if (sessionId) form.append('session_id', sessionId)
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
@@ -81,6 +88,16 @@ export async function sendAudio(audioBlob: Blob, sessionId?: string): Promise<Ch
     throw new Error(`Chat failed: ${err}`)
   }
   return res.json()
+}
+
+function guessExtension(mime: string): string {
+  if (!mime) return 'webm'
+  if (mime.includes('webm')) return 'webm'
+  if (mime.includes('ogg')) return 'ogg'
+  if (mime.includes('wav')) return 'wav'
+  if (mime.includes('mp4')) return 'mp4'
+  if (mime.includes('mpeg')) return 'mp3'
+  return 'webm'
 }
 
 export async function getCorrections(
@@ -106,6 +123,31 @@ export async function resetConversation(sessionId: string): Promise<void> {
     body: JSON.stringify({ session_id: sessionId }),
   })
   if (!res.ok) throw new Error('Failed to reset conversation')
+}
+
+export async function getSettings(sessionId: string): Promise<Settings> {
+  const res = await fetch(
+    `${API_BASE}/api/settings?session_id=${encodeURIComponent(sessionId)}`
+  )
+  if (!res.ok) {
+    if (res.status === 404) {
+      return { provider: 'minimax', model: 'MiniMax-Text-01' }
+    }
+    throw new Error('Failed to fetch settings')
+  }
+  return res.json()
+}
+
+export async function setSettings(sessionId: string, settings: Settings): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/settings?session_id=${encodeURIComponent(sessionId)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    }
+  )
+  if (!res.ok) throw new Error('Failed to save settings')
 }
 
 export function audioUrl(relativeUrl?: string): string | undefined {

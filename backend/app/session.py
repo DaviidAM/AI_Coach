@@ -12,6 +12,7 @@ class SessionData:
         self.level: str = "A1"
         self.last_activity: float = time.time()
         self.lock = Lock()
+        self.settings: dict = {"provider": "minimax", "model": "MiniMax-Text-01"}
 
 
 class SessionStore:
@@ -55,6 +56,17 @@ class SessionStore:
         session = self.get_or_create(session_id)
         with session.lock:
             session.messages = []
+            session.last_activity = time.time()
+
+    def get_settings(self, session_id: str) -> dict:
+        session = self.get_or_create(session_id)
+        with session.lock:
+            return dict(session.settings)
+
+    def set_settings(self, session_id: str, settings: dict) -> None:
+        session = self.get_or_create(session_id)
+        with session.lock:
+            session.settings = dict(settings)
             session.last_activity = time.time()
 
     def get_history_for_llm(self, session_id: str) -> list[dict]:

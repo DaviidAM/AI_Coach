@@ -9,6 +9,7 @@ from app.api.chat import router as chat_router
 from app.api.level import router as level_router
 from app.api.conversation import router as conversation_router
 from app.api.corrections import router as corrections_router
+from app.api.settings import router as settings_router
 
 app = FastAPI(title="AI Coach API", version="1.0.0")
 
@@ -33,3 +34,4 @@ app.include_router(chat_router, tags=["chat"])
 app.include_router(level_router, tags=["level"])
 app.include_router(conversation_router, tags=["conversation"])
 app.include_router(corrections_router, tags=["corrections"])
+app.include_router(settings_router, tags=["settings"])
