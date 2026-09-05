@@ -41,7 +41,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages])
 
   function appendMessage(msg: ChatMessage) {
@@ -80,11 +80,7 @@ export default function Home() {
 
     try {
       const res = await sendText(text, sessionId)
-      // user_audio_url is on the user message (was returned for text too)
-      updateMessageAt(messages.length, {
-        user_audio_url: res.user_audio_url,
-      })
-      // coach message is the last one
+      updateMessageAt(messages.length, { user_audio_url: res.user_audio_url })
       updateMessageAt(messages.length + 1, {
         text: res.coach_text,
         coach_audio_url: res.coach_audio_url,
@@ -121,8 +117,6 @@ export default function Home() {
       }
       mr.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
-        // Determine a sensible mime — fall back to webm if MediaRecorder
-        // produced something exotic that the backend doesn't support.
         const producedType = chunksRef.current[0]?.type || 'audio/webm'
         const blob = new Blob(chunksRef.current, { type: producedType })
         await submitAudio(blob)
@@ -211,9 +205,19 @@ export default function Home() {
   const latestCorrections =
     messages.length > 0 ? messages[messages.length - 1].corrections ?? [] : []
 
+  function timeOf(ts: number): string {
+    return new Date(ts).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   return (
     <div className={styles.chatPage}>
-      <Topbar />
+      <div className={styles.topbarZone}>
+        <Topbar />
+      </div>
+
       <main className={styles.chatMain}>
         <div className={styles.messagesArea}>
           {messages.length === 0 ? (
@@ -221,8 +225,8 @@ export default function Home() {
               <div className={styles.emptyEmoji}>🎯</div>
               <div className={styles.emptyTitle}>Start a conversation</div>
               <div className={styles.emptyHint}>
-                Type a message or hold the mic button to record audio. The COACH will reply in
-                text and audio, with corrections filtered to your selected CEFR level.
+                Type a message or hold the mic to record audio. The COACH replies in text
+                and audio, with corrections filtered to your selected CEFR level.
               </div>
             </div>
           ) : (
@@ -239,35 +243,31 @@ export default function Home() {
                   }`}
                   data-pending={m.pending ? 'true' : 'false'}
                 >
-                  {m.text}
-                </div>
+                  {m.text && (
+                    <div className={styles.bubbleText}>{m.text}</div>
+                  )}
 
-                {/* Audio player belongs to THIS message — under the user's bubble
-                    for user audio, under the coach's bubble for coach audio. */}
-                {!m.pending && m.user_audio_url && (
-                  <div className={styles.audioRow}>
-                    <AudioPlayer
-                      src={audioUrl(m.user_audio_url) || m.user_audio_url}
-                      label={m.role === 'user' ? 'You' : 'You'}
-                    />
-                  </div>
-                )}
-                {!m.pending && m.coach_audio_url && (
-                  <div className={styles.audioRow}>
-                    <AudioPlayer
-                      src={audioUrl(m.coach_audio_url) || m.coach_audio_url}
-                      label="Coach"
-                    />
-                  </div>
-                )}
+                  {!m.pending && m.user_audio_url && (
+                    <div className={styles.bubbleAudio}>
+                      <AudioPlayer
+                        src={audioUrl(m.user_audio_url) || m.user_audio_url}
+                        variant="user"
+                      />
+                    </div>
+                  )}
+                  {!m.pending && m.coach_audio_url && (
+                    <div className={styles.bubbleAudio}>
+                      <AudioPlayer
+                        src={audioUrl(m.coach_audio_url) || m.coach_audio_url}
+                        variant="coach"
+                      />
+                    </div>
+                  )}
 
-                <div className={styles.metaRow}>
-                  <span className={styles.timestamp}>
-                    {new Date(m.timestamp).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                  <div className={styles.bubbleMeta}>
+                    {m.pending && <span className={styles.pendingDot} aria-hidden="true" />}
+                    <span className={styles.timestamp}>{timeOf(m.timestamp)}</span>
+                  </div>
                 </div>
               </div>
             ))
@@ -332,7 +332,9 @@ export default function Home() {
                 aria-label="Send message"
                 title="Send (Enter)"
               >
-                ➤
+                <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                  <path d="M2 8l12-6-3 14-3-6-6-2z" fill="currentColor" />
+                </svg>
               </button>
             ) : (
               <button
@@ -347,20 +349,18 @@ export default function Home() {
                 aria-label={recording ? 'Recording — release to send' : 'Hold to record audio'}
                 title="Hold to record audio"
               >
-                {recording ? '⏹' : '🎤'}
+                <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor">
+                  <path d="M8 1a3 3 0 00-3 3v4a3 3 0 006 0V4a3 3 0 00-3-3zM3 8a5 5 0 0010 0h-1a4 4 0 11-8 0H3zM8 13a1 1 0 011 1v1H7v-1a1 1 0 011-1z" />
+                </svg>
               </button>
             )}
           </div>
           {messages.length > 0 && (
-            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+            <div className={styles.resetRow}>
               <button
+                className={styles.resetBtn}
                 onClick={handleReset}
                 disabled={busy}
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--text-muted)',
-                  textDecoration: 'underline',
-                }}
               >
                 Reset conversation
               </button>

@@ -5,18 +5,24 @@ import styles from './AudioPlayer.module.css'
 
 interface AudioPlayerProps {
   src: string
-  // Display label (e.g. "You", "Coach"). Optional — falls back to generic.
-  label?: string
+  /**
+   * Who is speaking? Used for the "You" / "Coach" label.
+   * Whichever role owns this audio is also what styles the player
+   * (the parent <span> carries messageUser / messageCoach classes,
+   *  and CSS Module :global rules style the inner buttons).
+   */
+  variant?: 'user' | 'coach'
 }
 
 /**
  * WhatsApp-style audio bubble.
- * Shows: play/pause button, animated waveform, and duration (mm:ss).
+ * Renders inline inside a chat bubble: play/pause, deterministic waveform,
+ * duration and progress (mm:ss).
  *
- * Auto-fetches metadata once the <audio> element loads to compute duration,
- * since the API doesn't return audio duration. Falls back to "0:00" while loading.
+ * Designed to live INSIDE a bubble (the parent .bubble carries the visual
+ * styling and color); this component focuses on behavior.
  */
-export function AudioPlayer({ src, label }: AudioPlayerProps) {
+export function AudioPlayer({ src, variant = 'coach' }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -51,7 +57,7 @@ export function AudioPlayer({ src, label }: AudioPlayerProps) {
         .then(() => setIsPlaying(true))
         .catch((err) => {
           console.warn('audio play failed', err)
-          setError('Tap again to enable audio')
+          setError('Tap to retry')
         })
     }
   }
@@ -63,27 +69,29 @@ export function AudioPlayer({ src, label }: AudioPlayerProps) {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  // Static waveform bars (deterministic per src so it doesn't jitter between renders).
-  // 28 bars is close to WhatsApp's visual density.
-  const bars = generateWaveform(src, 28)
+  // Static waveform bars (deterministic per src so it doesn't jitter
+  // between renders). 18 bars is enough density for visual rhythm
+  // without being noisy.
+  const bars = generateWaveform(src, 18)
+  const label = variant === 'user' ? 'You' : 'Coach'
 
   return (
-    <div className={styles.player}>
+    <div className={styles.player} data-variant={variant}>
       <button
         type="button"
         className={styles.playBtn}
         onClick={toggle}
-        aria-label={isPlaying ? 'Pause audio' : 'Play audio'}
+        aria-label={isPlaying ? 'Pause audio' : `Play ${label.toLowerCase()} audio`}
         data-testid="audio-play"
       >
         {isPlaying ? (
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-            <rect x="3" y="2" width="3.5" height="12" rx="0.5" fill="currentColor" />
-            <rect x="9.5" y="2" width="3.5" height="12" rx="0.5" fill="currentColor" />
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <rect x="3.5" y="2.5" width="3" height="11" rx="0.5" fill="currentColor" />
+            <rect x="9.5" y="2.5" width="3" height="11" rx="0.5" fill="currentColor" />
           </svg>
         ) : (
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-            <path d="M4 2.5v11l9-5.5z" fill="currentColor" />
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path d="M5 2.5v11l8-5.5z" fill="currentColor" />
           </svg>
         )}
       </button>
@@ -102,9 +110,14 @@ export function AudioPlayer({ src, label }: AudioPlayerProps) {
       </div>
 
       <div className={styles.meta}>
-        {label && <span className={styles.label}>{label}</span>}
-        <span className={styles.duration}>{formatTime(isPlaying ? currentTime : duration)}</span>
-        {error && <span className={styles.error}>{error}</span>}
+        {error ? (
+          <span className={styles.error}>{error}</span>
+        ) : (
+          <>
+            <span className={styles.label}>{label}</span>
+            <span className={styles.duration}>{formatTime(isPlaying ? currentTime : duration)}</span>
+          </>
+        )}
       </div>
 
       <audio
@@ -125,7 +138,7 @@ export function AudioPlayer({ src, label }: AudioPlayerProps) {
           setCurrentTime(0)
           setProgress(0)
         }}
-        onError={() => setError('Audio unavailable')}
+        onError={() => setError('Unavailable')}
       />
     </div>
   )
@@ -133,7 +146,7 @@ export function AudioPlayer({ src, label }: AudioPlayerProps) {
 
 /**
  * Deterministic pseudo-waveform from a string. Same src → same bars.
- * Heights in 25..100 range to look like a real voice waveform.
+ * Heights in 30..100 range, tapered at the edges for a natural look.
  */
 function generateWaveform(seed: string, count: number): number[] {
   let h = 0
@@ -143,8 +156,8 @@ function generateWaveform(seed: string, count: number): number[] {
   const out: number[] = []
   for (let i = 0; i < count; i++) {
     h = (h * 1103515245 + 12345) >>> 0
-    const base = (h % 75) + 25 // 25..99
-    // Taper edges to look like a bell curve
+    const base = (h % 70) + 30 // 30..99
+    // Taper edges with a sine bell so the waveform doesn't look square
     const t = Math.sin((Math.PI * (i + 1)) / (count + 1))
     out.push(Math.max(20, Math.round(base * t)))
   }
