@@ -176,3 +176,127 @@
   pointer-events: none;
   border: 2px solid var(--bg-primary, #0a0a0f);
 }
+
+/* =============================================================================
+ * Collapsible level selector (replaces the old 6-chip group on desktop)
+ * Single button shows the current level + caret; click reveals a dropdown
+ * panel listing all 6 CEFR levels. Outside-click and Escape close it.
+ * ============================================================================= */
+.levelSelector {
+  position: relative;
+  display: inline-block;
+}
+
+.levelSelectorBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.levelSelectorBtn:hover {
+  border-color: var(--accent-cyan);
+  background-color: var(--bg-tertiary);
+}
+
+.levelSelectorBtn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.levelValue {
+  color: var(--accent-cyan);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  min-width: 2.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.levelCaret {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+  display: inline-block;
+}
+
+.levelCaretOpen {
+  transform: rotate(180deg);
+}
+
+.levelMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  animation: levelMenuIn 0.12s ease-out;
+}
+
+@keyframes levelMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.levelMenu li {
+  list-style: none;
+}
+
+.levelMenuItem,
+.levelMenuItemActive {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.levelMenuItem:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.levelMenuItemActive {
+  background-color: var(--accent-indigo);
+  color: #fff;
+  font-weight: 600;
+}
+
+.levelMenuItemActive:hover {
+  background-color: var(--accent-indigo);
+}
+
+.levelMenuLevel {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  min-width: 2.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.levelMenuName {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
