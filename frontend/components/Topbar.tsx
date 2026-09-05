@@ -84,18 +84,22 @@ export function Topbar() {
 
       <div className={styles.right}>
         {isMobile ? (
-          <select
-            className={styles.dropdown}
-            value={level}
-            onChange={(e) => handleLevelChange(e.target.value as Level)}
-            aria-label="Select CEFR level"
-          >
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
+          <>
+            <span className={styles.levelLabel}>English Level:</span>
+            <select
+              className={styles.dropdown}
+              value={level}
+              onChange={(e) => handleLevelChange(e.target.value as Level)}
+              aria-label="Select CEFR level"
+            >
+              {LEVELS.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </>
         ) : (
           <div className={styles.chips} role="group" aria-label="CEFR level selector">
+            <span className={styles.levelLabel}>English Level:</span>
             {LEVELS.map((l) => (
               <button
                 key={l}
