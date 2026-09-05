@@ -1,0 +1,153 @@
+/* WhatsApp-style audio player.
+ * Lives INSIDE its own audio bubble (.bubbleAudio) which provides the
+ * background tint and border — the player itself is layout-only. */
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.playBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.bubbleAudio.bubbleUser .playBtn {
+  background: var(--accent-indigo);
+  color: #fff;
+}
+
+.bubbleAudio.bubbleCoach .playBtn {
+  background: var(--accent-indigo);
+  color: #fff;
+}
+
+.playBtn:hover {
+  filter: brightness(1.1);
+}
+
+.playBtn:active {
+  transform: scale(0.94);
+}
+
+.playBtn svg {
+  display: block;
+}
+
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  /* Take remaining space so the bars spread out */
+  flex: 1;
+  min-width: 60px;
+}
+
+/* Base bar styling — without this, the spans have no width/height and
+ * are invisible. The colour/opacity are overridden below per speaker.
+ *
+ * Use explicit longhand `flex: 1 1 0px` because the autoprefixer in
+ * Next.js's CSS pipeline sometimes drops `flex-basis` when given the
+ * shorthand `flex: 1`. */
+.bar {
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+  min-height: 4px;
+  max-height: 22px;
+  border-radius: 999px;
+  background: var(--accent-indigo);
+  opacity: 0.45;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transform-origin: center;
+}
+
+.barFilled {
+  opacity: 1;
+}
+
+/* The waveform bars need to contrast with the audio bubble background.
+ * User bubble = indigo background → bars must be WHITE/light
+ * Coach bubble = neutral background → bars stay indigo */
+
+/* =============================================================================
+ * Audio player style overrides — applied via descendant selectors
+ *
+ * The AudioPlayer component lives inside .bubbleAudio (in chat.module.css).
+ * We override the player's internal colors from here so we don't need to
+ * pass extra props for theming — the parent bubble class is the source
+ * of truth.
+ * ============================================================================= */
+
+/* Bar + label colors: both bubbles now share the same dark surface,
+ * so the indigo waveform + text-secondary labels work on both. */
+:global([data-audio-bubble="user"]) .bar,
+:global([data-audio-bubble="coach"]) .bar {
+  background: var(--accent-indigo);
+  opacity: 0.45;
+}
+
+:global([data-audio-bubble="user"]) .barFilled,
+:global([data-audio-bubble="coach"]) .barFilled {
+  opacity: 1;
+}
+
+:global([data-audio-bubble="user"]) .label,
+:global([data-audio-bubble="user"]) .duration,
+:global([data-audio-bubble="coach"]) .label,
+:global([data-audio-bubble="coach"]) .duration {
+  color: var(--text-secondary);
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.0625rem;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  min-width: 32px;
+}
+
+.label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+}
+
+.duration {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.6875rem;
+}
+
+/* The audio bubble color comes from the data-audio-bubble attribute on
+ * the wrapper (see .bubbleAudio.bubbleUser / .bubbleCoach in
+ * chat.module.css) plus the [data-audio-bubble="..."] selectors below.
+ * Both bubbles share the same dark surface so we only need one rule. */
+
+.bubbleAudio .label,
+.bubbleAudio .duration {
+  color: var(--text-secondary);
+}
+
+.error {
+  font-size: 0.625rem;
+  font-weight: 500;
+  opacity: 0.9;
+  color: var(--accent-danger);
+}

@@ -1,0 +1,21 @@
+[project]
+name = "ai-coach-backend"
+version = "1.0.0"
+description = "AI Coach backend API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "faster-whisper",
+    "edge-tts",
+    "python-multipart",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
