@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+from pathlib import Path
 
 from app.api.health import router as health_router
 from app.api.chat import router as chat_router
@@ -19,9 +20,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-static_path = "/static"
-if os.path.exists(static_path):
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
+# Resolve static dir relative to this file, not the CWD.
+# chat.py saves coach/user audio to app/static/audio/ — mount that.
+STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+(STATIC_DIR / "audio").mkdir(parents=True, exist_ok=True)
+(STATIC_DIR / "audio" / "stt").mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(health_router, prefix="/api", tags=["health"])
 app.include_router(chat_router, tags=["chat"])
