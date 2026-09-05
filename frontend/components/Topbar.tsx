@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LEVELS, Level, Theme } from '@/types'
 import { getLevel, setLevel } from '@/lib/api'
 import styles from './Topbar.module.css'
@@ -32,6 +32,8 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
   const [level, setLevelState] = useState<Level>('A2')
   const [theme, setThemeState] = useState<Theme>('dark')
   const [isMobile, setIsMobile] = useState(false)
+  const [levelMenuOpen, setLevelMenuOpen] = useState(false)
+  const levelMenuRef = useRef<HTMLDivElement>(null)
 
   // Load initial state
   useEffect(() => {
@@ -54,6 +56,25 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
     return () => mq.removeEventListener('change', handler)
   }, [])
 
+  // Close level menu on outside click or Escape
+  useEffect(() => {
+    if (!levelMenuOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (levelMenuRef.current && !levelMenuRef.current.contains(e.target as Node)) {
+        setLevelMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLevelMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [levelMenuOpen])
+
   const handleLevelChange = async (newLevel: Level) => {
     const prev = level
     setLevelState(newLevel)
@@ -63,6 +84,11 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
       // revert on error
       setLevelState(prev)
     }
+  }
+
+  const handleLevelSelect = (l: Level) => {
+    setLevelMenuOpen(false)
+    handleLevelChange(l)
   }
 
   const toggleTheme = () => {
@@ -98,18 +124,50 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
             </select>
           </>
         ) : (
-          <div className={styles.chips} role="group" aria-label="CEFR level selector">
-            <span className={styles.levelLabel}>English Level:</span>
-            {LEVELS.map((l) => (
-              <button
-                key={l}
-                className={`${styles.chip} ${level === l ? styles.chipActive : ''}`}
-                onClick={() => handleLevelChange(l)}
-                aria-pressed={level === l}
+          <div className={styles.levelSelector} ref={levelMenuRef}>
+            <button
+              type="button"
+              className={styles.levelSelectorBtn}
+              onClick={() => setLevelMenuOpen(!levelMenuOpen)}
+              aria-haspopup="listbox"
+              aria-expanded={levelMenuOpen}
+            >
+              <span className={styles.levelLabel}>English Level:</span>
+              <span className={styles.levelValue}>{level}</span>
+              <span
+                className={`${styles.levelCaret} ${levelMenuOpen ? styles.levelCaretOpen : ''}`}
+                aria-hidden="true"
               >
-                {l}
-              </button>
-            ))}
+                ▾
+              </span>
+            </button>
+            {levelMenuOpen && (
+              <ul
+                className={styles.levelMenu}
+                role="listbox"
+                aria-label="English level"
+              >
+                {LEVELS.map((l) => (
+                  <li key={l} role="option" aria-selected={l === level}>
+                    <button
+                      type="button"
+                      className={l === level ? styles.levelMenuItemActive : styles.levelMenuItem}
+                      onClick={() => handleLevelSelect(l)}
+                    >
+                      <span className={styles.levelMenuLevel}>{l}</span>
+                      <span className={styles.levelMenuName}>
+                        {l === 'A1' ? 'Beginner' :
+                         l === 'A2' ? 'Elementary' :
+                         l === 'B1' ? 'Intermediate' :
+                         l === 'B2' ? 'Upper-Int.' :
+                         l === 'C1' ? 'Advanced' :
+                         l === 'C2' ? 'Proficient' : ''}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

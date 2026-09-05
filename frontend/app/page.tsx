@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Topbar } from '@/components/Topbar'
 import { AudioPlayer } from '@/components/AudioPlayer'
 import { ErrorsModal } from '@/components/ErrorsModal'
+import { LoadingIndicator } from '@/components/LoadingIndicator'
 import {
   ChatMessage,
   Correction,
@@ -263,9 +264,11 @@ export default function Home() {
                   }`}
                   data-pending={m.pending ? 'true' : 'false'}
                 >
-                  {m.text && (
+                  {m.pending && !m.text ? (
+                    <LoadingIndicator />
+                  ) : m.text ? (
                     <div className={styles.bubbleText}>{m.text}</div>
-                  )}
+                  ) : null}
 
                   {!m.pending && m.user_audio_url && (
                     <div
