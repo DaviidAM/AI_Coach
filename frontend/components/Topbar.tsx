@@ -28,7 +28,7 @@ function getStoredSessionId(): string {
   return sid
 }
 
-export function Topbar() {
+export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; onOpenErrors?: () => void }) {
   const [level, setLevelState] = useState<Level>('A2')
   const [theme, setThemeState] = useState<Theme>('dark')
   const [isMobile, setIsMobile] = useState(false)
@@ -112,6 +112,16 @@ export function Topbar() {
             ))}
           </div>
         )}
+
+        <button
+          className={styles.errorsButton}
+          onClick={onOpenErrors}
+          aria-label="View error history"
+          title="Error history"
+        >
+          <span aria-hidden="true">📋</span>
+          {errorCount > 0 && <span className={styles.errorsBadge}>{errorCount}</span>}
+        </button>
 
         <button
           className={styles.themeToggle}

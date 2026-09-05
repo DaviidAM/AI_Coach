@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Topbar } from '@/components/Topbar'
 import { AudioPlayer } from '@/components/AudioPlayer'
+import { ErrorsModal } from '@/components/ErrorsModal'
 import {
   ChatMessage,
+  Correction,
   audioUrl,
   resetConversation,
   sendAudio,
@@ -30,6 +32,8 @@ export default function Home() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorsOpen, setErrorsOpen] = useState(false)
+  const [allCorrections, setAllCorrections] = useState<Correction[]>([])
   const [recording, setRecording] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -87,6 +91,9 @@ export default function Home() {
         corrections: res.corrections,
         pending: false,
       })
+      if (res.corrections?.length) {
+        setAllCorrections((prev) => [...prev, ...res.corrections])
+      }
     } catch (err: any) {
       console.error('sendText error', err)
       setError(err?.message || 'Failed to send message')
@@ -174,6 +181,9 @@ export default function Home() {
         corrections: res.corrections,
         pending: false,
       })
+      if (res.corrections?.length) {
+        setAllCorrections((prev) => [...prev, ...res.corrections])
+      }
     } catch (err: any) {
       console.error('audio submit error', err)
       setError(err?.message || 'Failed to send audio')
@@ -189,6 +199,7 @@ export default function Home() {
     try {
       await resetConversation(sessionId)
       setMessages([])
+      setAllCorrections([])
       setError(null)
     } catch (err: any) {
       setError(err?.message || 'Failed to reset')
@@ -215,8 +226,17 @@ export default function Home() {
   return (
     <div className={styles.chatPage}>
       <div className={styles.topbarZone}>
-        <Topbar />
+        <Topbar
+          errorCount={allCorrections.length}
+          onOpenErrors={() => setErrorsOpen(true)}
+        />
       </div>
+
+      <ErrorsModal
+        open={errorsOpen}
+        sessionId={sessionId}
+        onClose={() => setErrorsOpen(false)}
+      />
 
       <main className={styles.chatMain}>
         <div className={styles.messagesArea}>
