@@ -55,21 +55,54 @@
   min-width: 60px;
 }
 
-.bar {
-  flex: 1;
-  min-height: 4px;
-  max-height: 22px;
-  border-radius: 999px;
-  /* The bars follow the indigo accent — visible on both light and
-   * dark bubble backgrounds. */
+/* The waveform bars need to contrast with the audio bubble background.
+ * User bubble = indigo background → bars must be WHITE/light
+ * Coach bubble = neutral background → bars stay indigo */
+
+/* =============================================================================
+ * Audio player style overrides — applied via descendant selectors
+ *
+ * The AudioPlayer component lives inside .bubbleAudio (in chat.module.css).
+ * We override the player's internal colors from here so we don't need to
+ * pass extra props for theming — the parent bubble class is the source
+ * of truth.
+ * ============================================================================= */
+
+/* Bar colors: when this player sits inside a .chat_bubbleUser__* (light
+ * bubble), the bars need to be indigo with reduced opacity for contrast.
+ * For coach (dark bubble), indigo at higher opacity works on the
+ * darker background.
+ *
+ * We use :global() selectors because .chat_bubbleUser__XXX is generated
+ * by chat.module.css and may change hash; matching the literal CSS Module
+ * suffix would be fragile. */
+:global([data-audio-bubble="user"]) .bar {
   background: var(--accent-indigo);
-  opacity: 0.45;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  transform-origin: center;
+  opacity: 0.55;
 }
 
-.barFilled {
+:global([data-audio-bubble="user"]) .barFilled {
   opacity: 1;
+}
+
+:global([data-audio-bubble="coach"]) .bar {
+  background: var(--accent-indigo);
+  opacity: 0.45;
+}
+
+:global([data-audio-bubble="coach"]) .barFilled {
+  opacity: 1;
+}
+
+/* Label + duration colors */
+:global([data-audio-bubble="user"]) .label,
+:global([data-audio-bubble="user"]) .duration {
+  color: var(--accent-indigo);
+}
+
+:global([data-audio-bubble="coach"]) .label,
+:global([data-audio-bubble="coach"]) .duration {
+  color: var(--text-secondary);
 }
 
 .meta {
@@ -96,26 +129,24 @@
   font-size: 0.6875rem;
 }
 
-.bubbleUser .label,
-.bubbleUser .duration {
-  color: var(--accent-indigo);
+/* Label and duration inherit color from the parent audio bubble.
+ * User audio bubble is now light (off-white) → label/duration in
+ *   indigo for contrast against the light bubble.
+ * Coach audio bubble is neutral → label/duration in dark gray. */
+
+.bubbleAudio .label,
+.bubbleAudio .duration {
+  color: var(--text-primary);
 }
 
-.bubbleCoach .label,
-.bubbleCoach .duration {
-  color: var(--text-secondary);
+.bubbleAudio.bubbleUser .label,
+.bubbleAudio.bubbleUser .duration {
+  color: var(--accent-indigo);
 }
 
 .error {
   font-size: 0.625rem;
   font-weight: 500;
   opacity: 0.9;
-}
-
-.bubbleUser .error {
-  color: #FEE2E2;
-}
-
-.bubbleCoach .error {
-  color: #FCA5A5;
+  color: var(--accent-danger);
 }
