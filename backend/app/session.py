@@ -12,7 +12,9 @@ class SessionData:
         self.level: str = "A1"
         self.last_activity: float = time.time()
         self.lock = Lock()
-        self.settings: dict = {"provider": "minimax", "model": "MiniMax-Text-01"}
+        # OmniRoute is the default — it routes to free models without
+        # requiring an API key. MiniMax remains as a fallback option.
+        self.settings: dict = {"provider": "omniroute", "model": "auto/best-chat"}
 
 
 class SessionStore:

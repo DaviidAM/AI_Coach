@@ -9,6 +9,7 @@ class Correction(BaseModel):
     error_level: str = Field(pattern="^(A1|A2|B1|B2|C1|C2)$")
     category: str = "general"
     error_type: str = "general"
+    severity: str = "minor"  # "critical" | "minor" — filled by llm.py::parse_and_validate_reply if LLM omits
 
 
 class ChatResponse(BaseModel):
