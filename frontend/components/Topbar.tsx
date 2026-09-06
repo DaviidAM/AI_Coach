@@ -28,7 +28,17 @@ function getStoredSessionId(): string {
   return sid
 }
 
-export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; onOpenErrors?: () => void }) {
+export function Topbar({
+  errorCount = 0,
+  onOpenErrors,
+  messageCount,
+  messageLimit,
+}: {
+  errorCount?: number
+  onOpenErrors?: () => void
+  messageCount?: number
+  messageLimit?: number
+}) {
   const [level, setLevelState] = useState<Level>('A2')
   const [theme, setThemeState] = useState<Theme>('dark')
   const [isMobile, setIsMobile] = useState(false)
@@ -106,6 +116,18 @@ export function Topbar({ errorCount = 0, onOpenErrors }: { errorCount?: number; 
 
       <div className={styles.center}>
         <span className={styles.lang}>Demo Version</span>
+        {messageCount !== undefined && messageLimit !== undefined && (
+          <span
+            className={
+              messageCount === messageLimit
+                ? `${styles.lang} ${styles.demoExceeded}`
+                : styles.lang
+            }
+          >
+            ({messageCount}/{messageLimit})
+            {messageCount === messageLimit && ' ⚠️'}
+          </span>
+        )}
       </div>
 
       <div className={styles.right}>

@@ -39,6 +39,10 @@
   white-space: nowrap;
 }
 
+.demoExceeded {
+  color: var(--accent-danger, #ef4444);
+}
+
 .right {
   display: flex;
   align-items: center;
