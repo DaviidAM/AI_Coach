@@ -5,6 +5,7 @@ import { Topbar } from '@/components/Topbar'
 import { AudioPlayer } from '@/components/AudioPlayer'
 import { ErrorsModal } from '@/components/ErrorsModal'
 import { LoadingIndicator } from '@/components/LoadingIndicator'
+import { CoachIcon } from '@/components/icons/CoachIcon'
 import {
   ChatMessage,
   Correction,
@@ -253,7 +254,7 @@ export default function Home() {
         <div className={styles.messagesArea}>
           {messages.length === 0 ? (
             <div className={styles.empty}>
-              <div className={styles.emptyEmoji}>🤖</div>
+              <div className={styles.emptyEmoji}><CoachIcon size={64} /></div>
               <div className={styles.emptyTitle}>Start a conversation</div>
               <div className={styles.emptyHint}>
                 Type a message or hold the mic to record audio. The COACH replies in text
