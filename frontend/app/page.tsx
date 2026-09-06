@@ -68,11 +68,7 @@ export default function Home() {
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim()
-    if (!text || busy || !sessionId) return
-    if (atLimit) {
-      setError('Demo version message limit exceeded. Reset the conversation to continue.')
-      return
-    }
+    if (!text || busy || !sessionId || atLimit) return
     setError(null)
     setInput('')
 
@@ -213,12 +209,15 @@ export default function Home() {
       setError(null)
     } catch (err: any) {
       setError(err?.message || 'Failed to reset')
+    } finally {
+      setBusy(false)
     }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
+      if (atLimit) return
       send()
     }
   }
@@ -349,19 +348,19 @@ export default function Home() {
         )}
 
         <div className={styles.inputArea}>
-          <div className={styles.inputWrapper}>
+          <div className={`${styles.inputWrapper} ${atLimit ? styles.inputBlocked : ''}`}>
             <textarea
               className={styles.textInput}
               placeholder={
-                recording
-                  ? '🔴 Recording... release to send'
+                atLimit
+                  ? 'Demo version message limit reached. Use the Reset button to continue.'
                   : 'Type a message — Enter to send, Shift+Enter for newline'
               }
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               rows={1}
-              disabled={busy}
+              disabled={atLimit}
               aria-label="Message input"
             />
             {input.trim().length > 0 ? (
@@ -395,6 +394,11 @@ export default function Home() {
               </button>
             )}
           </div>
+          {atLimit && (
+            <p className={styles.inputBlockedMessage}>
+              Demo version limit reached. Click Reset conversation to start over.
+            </p>
+          )}
           {messages.length > 0 && (
             <div className={styles.resetRow}>
               <button
