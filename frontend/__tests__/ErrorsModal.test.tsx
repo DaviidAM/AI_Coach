@@ -9,6 +9,21 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ErrorsModal } from '@/components/ErrorsModal'
 import type { Correction } from '@/lib/api'
 
+// ─── Mock jspdf ─────────────────────────────────────────────────────────────────
+
+jest.mock('jspdf', () => {
+  return jest.fn().mockImplementation(() => ({
+    setFontSize: jest.fn(),
+    text: jest.fn(),
+    save: jest.fn(),
+    lastAutoTable: { finalY: 0 },
+  }))
+})
+
+jest.mock('jspdf-autotable', () => {
+  return jest.fn()
+})
+
 // ─── Mock fetch ────────────────────────────────────────────────────────────────
 
 const fetchMock = jest.fn()
@@ -42,7 +57,7 @@ const sampleCorrections: Correction[] = [
     original_phrase: 'I go to school yesterday',
     corrected_phrase: 'I went to school yesterday',
     explanation: 'Use past tense for completed actions',
-    error_level: 'grammar',
+    error_level: 'B1',
     category: 'grammar',
     timestamp: '2024-01-01T10:00:00Z',
   },
@@ -51,7 +66,7 @@ const sampleCorrections: Correction[] = [
     original_phrase: 'She have a car',
     corrected_phrase: 'She has a car',
     explanation: 'Subject-verb agreement',
-    error_level: 'grammar',
+    error_level: 'C1',
     category: 'grammar',
     timestamp: '2024-01-01T10:05:00Z',
   },
