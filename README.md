@@ -73,10 +73,10 @@ Both sides read environment variables. No file-based config.
 
 ### Backend
 
-- `OMNIROUTE_BASE_URL` — required. OpenAI-compatible chat completions
-  endpoint (default: `http://localhost:8082/v1`).
+- `OMNIROUTE_BASE_URL` — required. OpenAI-compatible chat completions endpoint (default: `http://localhost:8082/v1`).
 - `OMNIROUTE_API_KEY` — optional. Most gateways don't require one.
-- `MINIMAX_API_KEY` — fallback provider. Not used by default.
+
+> Note: More LLM providers coming soon.
 
 ### Frontend
 
