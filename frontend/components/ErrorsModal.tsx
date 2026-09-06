@@ -25,13 +25,18 @@ function groupCorrections(
     // Newest first — single group, no heading
     return { 'Recent': [...corrections].sort((a, b) => (+b.timestamp! || 0) - (+a.timestamp! || 0)) }
   }
-  // Group by error_level, descending C2→A1
+  // Group by error_level, descending C2→A1, newest within each level first
   const map: Record<string, Correction[]> = {}
   for (const lvl of LEVEL_ORDER) map[lvl] = []
   for (const c of corrections) {
     const lvl = (c.error_level ?? 'A1') as string
     if (map[lvl]) map[lvl].push(c)
     else map[lvl] = [c]
+  }
+  for (const lvl of LEVEL_ORDER) {
+    if (map[lvl].length > 0) {
+      map[lvl].sort((a, b) => (+b.timestamp! || 0) - (+a.timestamp! || 0))
+    }
   }
   return map
 }
@@ -71,7 +76,7 @@ export function ErrorsModal({ open, sessionId, onClose }: ErrorsModalProps) {
   const [corrections, setCorrections] = useState<Correction[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [sortBy, setSortBy] = useState<SortBy>('level')
+  const [sortBy, setSortBy] = useState<SortBy>('recency')
 
   useEffect(() => {
     if (!open || !sessionId) return
@@ -169,17 +174,15 @@ export function ErrorsModal({ open, sessionId, onClose }: ErrorsModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(grouped).map(([level, list]) => {
+                {sortBy === 'level' && Object.entries(grouped).map(([level, list]) => {
                   if (list.length === 0) return null
                   return (
                     <tr key={`group-${level}`}>
-                      <td colSpan={5} className={styles.groupCell}>
-                        {sortBy === 'level' ? level : null}
-                      </td>
+                      <td colSpan={5} className={styles.groupCell}>{level}</td>
                     </tr>
                   )
                 })}
-                {corrections.map((c) => (
+                {Object.values(grouped).flat().map((c) => (
                   <tr key={c.id ?? `${c.original_phrase}-${c.timestamp}`} className={styles.dataRow}>
                     <td className={styles.cellOriginal}>{c.original_phrase}</td>
                     <td className={styles.cellCorrected}>{c.corrected_phrase}</td>
