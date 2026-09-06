@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LEVELS, Level, Theme } from '@/types'
 import { getLevel, setLevel } from '@/lib/api'
 import styles from './Topbar.module.css'
+import { CoachIcon } from './icons/CoachIcon'
 
 const THEME_KEY = 'ai-coach-theme'
 const SESSION_KEY = 'ai-coach-session-id'
@@ -110,7 +111,7 @@ export function Topbar({
   return (
     <nav className={styles.topbar}>
       <div className={styles.left}>
-        <span className={styles.logo} aria-hidden="true">🤖</span>
+        <span className={styles.logo} aria-hidden="true"><CoachIcon size={32} /></span>
         <span className={styles.brand}>English AI Coach</span>
       </div>
 
