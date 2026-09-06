@@ -5,6 +5,11 @@
 > LLM routed through OmniRoute (a self-hosted multi-provider gateway).
 
 ![AI Coach dark mode](docs/screenshots/chat-dark.png)
+![AI Coach light mode](docs/screenshots/chat-light.png)
+![Topbar](docs/screenshots/topbar.png)
+![Level dropdown](docs/screenshots/level-dropdown-open.png)
+![All Corrections modal](docs/screenshots/errors-modal.png)
+![Loading state](docs/screenshots/loading.png)
 
 ## Features
 
