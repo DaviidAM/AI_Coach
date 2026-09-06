@@ -16,6 +16,7 @@ import {
 import styles from './chat.module.css'
 
 const SESSION_KEY = 'ai-coach-session-id'
+const MESSAGES_LIMIT = 5
 
 function getStoredSessionId(): string {
   if (typeof window === 'undefined') return crypto.randomUUID()
@@ -36,6 +37,9 @@ export default function Home() {
   const [errorsOpen, setErrorsOpen] = useState(false)
   const [allCorrections, setAllCorrections] = useState<Correction[]>([])
   const [recording, setRecording] = useState(false)
+
+  const userMessageCount = messages.filter((m) => m.role === 'user').length
+  const atLimit = userMessageCount >= MESSAGES_LIMIT
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -65,6 +69,10 @@ export default function Home() {
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim()
     if (!text || busy || !sessionId) return
+    if (atLimit) {
+      setError('Demo version message limit exceeded. Reset the conversation to continue.')
+      return
+    }
     setError(null)
     setInput('')
 
@@ -105,7 +113,7 @@ export default function Home() {
   }
 
   async function startRecording() {
-    if (busy || !sessionId) return
+    if (busy || !sessionId || atLimit) return
     setError(null)
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Microphone API not available in this browser.')
@@ -230,6 +238,8 @@ export default function Home() {
         <Topbar
           errorCount={allCorrections.length}
           onOpenErrors={() => setErrorsOpen(true)}
+          messageCount={userMessageCount}
+          messageLimit={MESSAGES_LIMIT}
         />
       </div>
 
@@ -357,7 +367,7 @@ export default function Home() {
               <button
                 className={`${styles.iconBtn} ${styles.sendBtn}`}
                 onClick={() => send()}
-                disabled={busy}
+                disabled={busy || atLimit}
                 aria-label="Send message"
                 title="Send (Enter)"
               >
@@ -373,7 +383,7 @@ export default function Home() {
                 onMouseLeave={() => recording && stopRecording()}
                 onTouchStart={startRecording}
                 onTouchEnd={stopRecording}
-                disabled={busy}
+                disabled={busy || atLimit}
                 data-recording={recording ? 'true' : 'false'}
                 aria-label={recording ? 'Recording — release to send' : 'Hold to record audio'}
                 title="Hold to record audio"
