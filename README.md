@@ -4,14 +4,12 @@
 > speaks back. Built as a Next.js + FastAPI showcase of a free-model
 > LLM routed through OmniRoute (a self-hosted multi-provider gateway).
 
-![AI Coach — full conversation with correction](docs/screenshots/chat-hero.png)
+![AI Coach — conversation with a correction highlighted](docs/screenshots/chat-hero.png)
 
 A student practices English and the COACH detects, explains and corrects
-errors in real time.
-
-| ![Light mode](docs/screenshots/chat-light.png) Light, daytime | ![Dark mode](docs/screenshots/chat-dark.png) Dark, default |
-|---|---|
-| ![All Corrections modal](docs/screenshots/errors-modal-table.png) The full correction history with category and severity badges, downloadable as PDF. | ![Mobile view](docs/screenshots/chat-mobile.png) Same flow on a 375×812 viewport. |
+errors in real time. In the screenshot above, the user wrote
+*"I have many homework to do"*; the COACH replies and the live corrections
+panel flags `many homework → a lot of homework` (A1, uncountable noun).
 
 ## Features
 
