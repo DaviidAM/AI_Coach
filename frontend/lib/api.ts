@@ -117,11 +117,13 @@ export async function getCorrections(
 }
 
 export async function resetConversation(sessionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/conversation/reset`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: sessionId }),
-  })
+  // Backend expects session_id as a query param, NOT in JSON body.
+  // See backend/app/api/conversation.py — the FastAPI route declares
+  // session_id: str without Body(), so it lives in the query string.
+  const res = await fetch(
+    `${API_BASE}/api/conversation/reset?session_id=${encodeURIComponent(sessionId)}`,
+    { method: 'POST' }
+  )
   if (!res.ok) throw new Error('Failed to reset conversation')
 }
 

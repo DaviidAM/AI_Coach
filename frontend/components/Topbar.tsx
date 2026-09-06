@@ -117,16 +117,16 @@ export function Topbar({
       <div className={styles.center}>
         <span className={styles.lang}>Demo Version</span>
         {messageCount !== undefined && messageLimit !== undefined && (
-          <span
-            className={
-              messageCount === messageLimit
-                ? `${styles.lang} ${styles.demoExceeded}`
-                : styles.lang
-            }
-          >
-            ({messageCount}/{messageLimit})
-            {messageCount === messageLimit && ' ⚠️'}
-          </span>
+          <>
+            <span className={styles.demoCounter}>
+              {Math.min(messageCount, messageLimit)} of {messageLimit} demo messages used
+            </span>
+            {messageCount === messageLimit && (
+              <span className={styles.demoLimitFlag}>
+                <span aria-hidden="true">⚠️</span> limit reached
+              </span>
+            )}
+          </>
         )}
       </div>
 
