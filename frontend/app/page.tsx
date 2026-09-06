@@ -203,8 +203,9 @@ export default function Home() {
   }
 
   async function handleReset() {
-    if (busy || !sessionId) return
+    if (!sessionId) return
     if (!confirm('Reset conversation and clear history?')) return
+    setBusy(true)
     try {
       await resetConversation(sessionId)
       setMessages([])
