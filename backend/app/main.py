@@ -1,8 +1,11 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import os
-from pathlib import Path
 
 from app.api.health import router as health_router
 from app.api.chat import router as chat_router
@@ -10,8 +13,27 @@ from app.api.level import router as level_router
 from app.api.conversation import router as conversation_router
 from app.api.corrections import router as corrections_router
 from app.api.settings import router as settings_router
+from app.audio_janitor import run_janitor
 
-app = FastAPI(title="AI Coach API", version="1.0.0")
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the audio janitor on boot; stop it cleanly on shutdown."""
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(run_janitor(stop_event))
+    try:
+        yield
+    finally:
+        stop_event.set()
+        try:
+            await asyncio.wait_for(task, timeout=5)
+        except asyncio.TimeoutError:
+            task.cancel()
+
+
+app = FastAPI(title="AI Coach API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
