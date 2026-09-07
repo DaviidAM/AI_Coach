@@ -1,0 +1,44 @@
+# Dockerfile.backend — AI Coach FastAPI service
+# Used by Render (render.yaml) and the dev docker-compose.
+#
+# Runtime: Python 3.11 + uv-managed deps + FastAPI + audio janitor.
+
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# OS deps for faster-whisper (audio), edge-tts (network), curl (healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ffmpeg \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (used by backend)
+RUN pip install --no-cache-dir uv
+
+WORKDIR /app/backend
+
+# Install backend deps into a venv via uv (cached layer)
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev
+
+# Copy the rest of the backend source
+COPY backend/ ./
+
+# Make sure the audio janitor has writable dirs (Render provides ephemeral disk,
+# so audio is regenerated each restart — janitor keeps the in-runtime dir clean).
+RUN mkdir -p /app/backend/app/static/audio /app/backend/app/static/audio/stt
+
+EXPOSE 10000
+
+# Render injects $PORT (default 10000). Fall back to 8091 for local docker.
+ENV PORT=10000
+
+# Health check — backend exposes /api/health with real probes
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -fsS http://localhost:${PORT:-8091}/api/health || exit 1
+
+CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8091}"]

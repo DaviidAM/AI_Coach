@@ -1,24 +1,24 @@
-# docker-compose.yml for AI Coach
+# docker-compose.yml for AI Coach (local dev)
 #
-# Builds BOTH services from the single ./Dockerfile using `target:`.
+# Uses TWO dedicated Dockerfiles:
+#   - Dockerfile.backend  → ai-coach-backend service
+#   - Dockerfile.frontend → ai-coach-frontend service
+#
+# The single multi-stage Dockerfile at the repo root is kept for
+# reference / experimentation but is NOT used by this compose file.
+#
 # Run:  docker compose up -d --build
 # Stop: docker compose down
-#
-# Configuration via environment variables (see backend/.env.example and
-# frontend/.env.example for the full list).
 
 services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: backend
+      dockerfile: Dockerfile.backend
     image: ai-coach-backend:local
     container_name: ai-coach-backend
     restart: unless-stopped
     ports:
-      # External port can be remapped; default keeps parity with the
-      # currently-running local uvicorn on 8091.
       - "${BACKEND_PORT:-8091}:8091"
     environment:
       - PORT=8091
@@ -41,8 +41,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: frontend
+      dockerfile: Dockerfile.frontend
       args:
         # Baked into the JS bundle at build time. Override via .env or
         # the shell: NEXT_PUBLIC_API_URL=https://api.example.com docker compose build
@@ -54,6 +53,7 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8091}
+      - PORT=3000
     depends_on:
       backend:
         condition: service_healthy
