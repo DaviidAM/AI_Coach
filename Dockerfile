@@ -49,21 +49,21 @@ RUN uv sync --frozen --no-dev
 # Copy the rest of the backend source. `backend/app/...` -> `/app/backend/app/...`
 COPY backend/ ./
 
-# Backend listens on 8091 in dev; the docker-compose exposes 8000 externally
-ENV PORT=8091 \
-    OMNIROUTE_BASE_URL="" \
+# Backend listens on Render's injected $PORT (default 10000) in prod,
+# or whatever PORT the local dev environment exports.
+ENV OMNIROUTE_BASE_URL="" \
     PYTHONUNBUFFERED=1
 
 # Make sure the audio janitor has a writable place to put files
 RUN mkdir -p /app/backend/app/static/audio /app/backend/app/static/audio/stt
 
-EXPOSE 8091
+EXPOSE 8091   # local-dev default; Render overrides with PORT=10000
 
 # Health check — backend exposes /api/health with real probes
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -fsS http://localhost:8091/api/health || exit 1
+    CMD curl -fsS http://localhost:${PORT:-8091}/api/health || exit 1
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8091"]
+CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8091}"]
 
 # ============================================================
 # Stage: frontend-builder — install deps + Next.js build

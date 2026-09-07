@@ -1,0 +1,62 @@
+# Render Blueprint for AI Coach.
+# Deploy: render.com/dashboard -> "New" -> "Blueprint" -> point at this repo
+# Docs:   https://docs.render.com/blueprint-spec
+
+services:
+  # ---------------------------------------------------------------
+  # Backend — FastAPI on the port Render injects via $PORT (default 10000)
+  # ---------------------------------------------------------------
+  - type: web
+    name: ai-coach-backend
+    runtime: docker
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    target: backend
+    plan: starter             # change to free / standard / pro as needed
+    region: oregon
+    branch: main              # auto-deploy when PR #3 merges to main
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000          # Render will expose this; backend binds to $PORT
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Secrets — set these manually in the Render dashboard.
+      # DO NOT commit real values to the repo.
+      - key: OMNIROUTE_BASE_URL
+        sync: false
+      - key: OMNIROUTE_API_KEY
+        sync: false
+      - key: MINIMAX_API_KEY
+        sync: false
+      # Janitor config (optional overrides)
+      - key: AUDIO_CLEANUP_INTERVAL_SECONDS
+        value: "3600"
+      - key: AUDIO_MAX_AGE_SECONDS
+        value: "3600"
+
+  # ---------------------------------------------------------------
+  # Frontend — Next.js on Render's injected $PORT (default 10000)
+  # ---------------------------------------------------------------
+  - type: web
+    name: ai-coach-frontend
+    runtime: docker
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    target: frontend
+    plan: starter
+    region: oregon
+    branch: main
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # Backend's public URL on Render. Render resolves the service name
+      # <service-name>.onrender.com. We use the explicit URL here so the
+      # bundle is built with the right value.
+      - key: NEXT_PUBLIC_API_URL
+        value: https://ai-coach-backend.onrender.com
+      - key: NODE_ENV
+        value: production
