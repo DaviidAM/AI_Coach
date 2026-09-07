@@ -57,7 +57,8 @@ ENV OMNIROUTE_BASE_URL="" \
 # Make sure the audio janitor has a writable place to put files
 RUN mkdir -p /app/backend/app/static/audio /app/backend/app/static/audio/stt
 
-EXPOSE 8091   # local-dev default; Render overrides with PORT=10000
+# local-dev default; Render overrides with PORT=10000 at runtime
+EXPOSE 8091
 
 # Health check — backend exposes /api/health with real probes
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
