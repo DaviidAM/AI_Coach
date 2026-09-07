@@ -1,33 +1,73 @@
-version: "3.9"
+# docker-compose.yml for AI Coach
+#
+# Builds BOTH services from the single ./Dockerfile using `target:`.
+# Run:  docker compose up -d --build
+# Stop: docker compose down
+#
+# Configuration via environment variables (see backend/.env.example and
+# frontend/.env.example for the full list).
 
 services:
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
+      target: backend
+    image: ai-coach-backend:local
     container_name: ai-coach-backend
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      # External port can be remapped; default keeps parity with the
+      # currently-running local uvicorn on 8091.
+      - "${BACKEND_PORT:-8091}:8091"
+    environment:
+      - PORT=8091
+      - OMNIROUTE_BASE_URL=${OMNIROUTE_BASE_URL:-http://host.docker.internal:8082/v1}
+      - OMNIROUTE_API_KEY=${OMNIROUTE_API_KEY:-}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - AUDIO_CLEANUP_INTERVAL_SECONDS=${AUDIO_CLEANUP_INTERVAL_SECONDS:-3600}
+      - AUDIO_MAX_AGE_SECONDS=${AUDIO_MAX_AGE_SECONDS:-3600}
+    volumes:
+      # Persist runtime audio across container restarts.
+      - ai-coach-audio:/app/backend/app/static/audio
+      - ai-coach-audio-stt:/app/backend/app/static/audio/stt
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8091/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
+      start_period: 15s
 
   frontend:
     build:
-      context: ./frontend
+      context: .
       dockerfile: Dockerfile
+      target: frontend
+      args:
+        # Baked into the JS bundle at build time. Override via .env or
+        # the shell: NEXT_PUBLIC_API_URL=https://api.example.com docker compose build
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8091}
+    image: ai-coach-frontend:local
     container_name: ai-coach-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
-    depends_on:
-      - backend
     restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8091}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 networks:
   default:
     name: ai-coach-network
+
+volumes:
+  ai-coach-audio:
+  ai-coach-audio-stt:
