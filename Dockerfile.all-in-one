@@ -1,0 +1,89 @@
+# Dockerfile.all-in-one — AI Coach (frontend + backend en UN contenedor)
+#
+# Para Render (Plan free con sleep) o cualquier PaaS que solo permita 1 servicio.
+# NO recomendado para producción real (single point of failure), pero útil
+# para demos y deployments de bajo tráfico.
+#
+# Layout:
+#   /app/backend/  → FastAPI en :8091
+#   /app/frontend/ → Next.js en :3000
+#   /app/start.sh  → lanza ambos en background
+#
+# Render expone $PORT (default 10000). El frontend escucha ahí (Next.js respeta $PORT),
+# el backend escucha en :8091 internamente. Nginx NO es necesario porque ambos
+# servicios sirven a puertos distintos y Render solo expone $PORT.
+
+# ============================================================
+# Stage: backend-builder — Python deps cached layer
+# ============================================================
+FROM python:3.11-slim AS backend-builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir uv
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv export --frozen --no-hashes --no-dev -o requirements.txt
+# Use pip for a single-layer install of the deps (no venv needed in runtime image)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ============================================================
+# Stage: frontend-builder — Next.js production build
+# ============================================================
+FROM node:20-alpine AS frontend-builder
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+ARG NEXT_PUBLIC_API_URL=http://localhost:8091
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+RUN npm run build
+
+# ============================================================
+# Stage: runtime — single image with both services
+# ============================================================
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# System deps: curl (healthcheck), ffmpeg (audio), node + npm (frontend runtime)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ffmpeg \
+        ca-certificates \
+        nodejs \
+        npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Backend: copy source + install deps from builder stage
+COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-builder /usr/local/bin /usr/local/bin
+COPY backend/ /app/backend/
+
+# Frontend: copy the built Next.js bundle + node_modules
+COPY --from=frontend-builder /build/.next /app/frontend/.next
+COPY --from=frontend-builder /build/public /app/frontend/public
+COPY --from=frontend-builder /build/node_modules /app/frontend/node_modules
+COPY --from=frontend-builder /build/package.json /app/frontend/package.json
+COPY --from=frontend-builder /build/next.config.js /app/frontend/next.config.js
+
+# Audio janitor needs writable dirs
+RUN mkdir -p /app/backend/app/static/audio /app/backend/app/static/audio/stt
+
+# Supervisor script: launches both services and tails their logs
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Ports: backend 8091 (internal), frontend $PORT (Render exposes this)
+EXPOSE 10000 8091
+
+# Healthcheck hits the frontend root
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:${PORT:-10000}/ || exit 1
+
+# Single CMD that launches both via the supervisor script
+CMD ["/app/start.sh"]
