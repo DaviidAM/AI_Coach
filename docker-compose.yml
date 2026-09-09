@@ -1,11 +1,19 @@
-# docker-compose.yml for AI Coach (local dev)
+# docker-compose.yml for AI Coach
 #
-# Uses TWO dedicated Dockerfiles:
-#   - Dockerfile.backend  → ai-coach-backend service
-#   - Dockerfile.frontend → ai-coach-frontend service
+# Single multi-service stack (backend + frontend). Coolify and local
+# dev both use this file.
 #
-# The single multi-stage Dockerfile at the repo root is kept for
-# reference / experimentation but is NOT used by this compose file.
+# Services:
+#   - backend  → Dockerfile.backend  → FastAPI on :8091
+#   - frontend → Dockerfile.frontend → Next.js on :3000
+#
+# Both services share the same source tree (context: .) but each one
+# has its own Dockerfile because the build/runtime images are
+# different (Python+slim vs Node).
+#
+# OmniRoute runs as a systemd service on the host (port 20128); the
+# backend reaches it via host.docker.internal:20128. See README.md
+# for the full configuration reference and fallback chain.
 #
 # Run:  docker compose up -d --build
 # Stop: docker compose down
@@ -22,8 +30,13 @@ services:
       - "${BACKEND_PORT:-8091}:8091"
     environment:
       - PORT=8091
-      - OMNIROUTE_BASE_URL=${OMNIROUTE_BASE_URL:-http://host.docker.internal:8082/v1}
+      # OmniRoute gateway — see README "Configuration > Backend" for the
+      # full reference. Defaults below match the documented behaviour when
+      # no env override is set.
+      - OMNIROUTE_BASE_URL=${OMNIROUTE_BASE_URL:-http://host.docker.internal:20128/v1}
       - OMNIROUTE_API_KEY=${OMNIROUTE_API_KEY:-}
+      - OMNIROUTE_DEFAULT_MODEL=${OMNIROUTE_DEFAULT_MODEL:-auto/best-chat}
+      - OMNIROUTE_DEFAULT_COMBO_FALLBACK=${OMNIROUTE_DEFAULT_COMBO_FALLBACK:-primary-chain}
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
       - AUDIO_CLEANUP_INTERVAL_SECONDS=${AUDIO_CLEANUP_INTERVAL_SECONDS:-3600}
       - AUDIO_MAX_AGE_SECONDS=${AUDIO_MAX_AGE_SECONDS:-3600}
