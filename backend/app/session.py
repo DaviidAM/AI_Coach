@@ -6,6 +6,8 @@ MAX_MESSAGES = 10
 IDLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
 
 
+from app.llm import DEFAULT_SETTINGS
+
 class SessionData:
     def __init__(self):
         self.messages: list[dict] = []
@@ -14,7 +16,8 @@ class SessionData:
         self.lock = Lock()
         # OmniRoute is the default — it routes to free models without
         # requiring an API key. MiniMax remains as a fallback option.
-        self.settings: dict = {"provider": "omniroute", "model": "auto/best-chat"}
+        # Model is read from env-backed DEFAULT_SETTINGS.
+        self.settings: dict = DEFAULT_SETTINGS.copy()
 
 
 class SessionStore:
