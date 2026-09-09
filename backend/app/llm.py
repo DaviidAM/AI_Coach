@@ -247,16 +247,16 @@ def call_llm(messages: list[dict], settings: dict) -> str:
 
         if resp.status_code != 200:
             raise LLMError(f"{provider} API returned {resp.status_code}: {resp.text[:300]}")
-            # Defensive parsing — strip any leading "data: " prefixes
-            # from SSE that some gateways leak through.
-            text = resp.text
-            if text.startswith("data:"):
-                # SSE format — take last complete JSON chunk
-                chunks = [c[len("data:"):].strip() for c in text.split("\n\n") if c.startswith("data:")]
-                last = [c for c in chunks if c and c != "[DONE]"]
-                text = last[-1] if last else text
-            result = json.loads(text)
-            return result["choices"][0]["message"]["content"]
+        # Defensive parsing — strip any leading "data: " prefixes
+        # from SSE that some gateways leak through.
+        text = resp.text
+        if text.startswith("data:"):
+            # SSE format — take last complete JSON chunk
+            chunks = [c[len("data:"):].strip() for c in text.split("\n\n") if c.startswith("data:")]
+            last = [c for c in chunks if c and c != "[DONE]"]
+            text = last[-1] if last else text
+        result = json.loads(text)
+        return result["choices"][0]["message"]["content"]
 
     # Anthropic
     if provider == "anthropic":
