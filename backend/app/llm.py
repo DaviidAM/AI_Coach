@@ -22,12 +22,16 @@ PROVIDERS = {
     },
 }
 
+# Env-backed defaults — backward compatible, no hardcoded values.
+OMNIROUTE_DEFAULT_MODEL = os.getenv("OMNIROUTE_DEFAULT_MODEL", "auto/best-chat")
+OMNIROUTE_DEFAULT_COMBO_FALLBACK = os.getenv("OMNIROUTE_DEFAULT_COMBO_FALLBACK", "primary-chain")
+
 # Default settings when none provided.
 # OmniRoute is the default in this environment because it routes to the
 # best available free model without needing an API key. Demo-Combo has
 # strict quality checks that fail on free models — `auto/best-chat`
 # routes to whichever model is currently the best fit.
-DEFAULT_SETTINGS = {"provider": "omniroute", "model": "auto/best-chat"}
+DEFAULT_SETTINGS = {"provider": "omniroute", "model": OMNIROUTE_DEFAULT_MODEL}
 
 
 SYSTEM_PROMPT = """You are COACH, a friendly English teacher chatting with a student on WhatsApp.
@@ -191,6 +195,8 @@ def call_llm(messages: list[dict], settings: dict) -> str:
     """
     Dispatch to the correct provider based on settings.provider.
     Returns the raw content string from the LLM response.
+    On OmniRoute 401/404 with a non-fallback model, automatically retries
+    with OMNIROUTE_DEFAULT_COMBO_FALLBACK before propagating the error.
     """
     provider = settings.get("provider", "minimax")
     model = settings.get("model", "")
@@ -224,10 +230,23 @@ def call_llm(messages: list[dict], settings: dict) -> str:
             # OmniRoute) default to SSE unless we ask for plain JSON.
             "Accept": "application/json",
         }
-        with httpx.Client(timeout=60.0) as client:
-            resp = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
-            if resp.status_code != 200:
-                raise LLMError(f"{provider} API returned {resp.status_code}: {resp.text[:300]}")
+
+        def _do_request(model_to_use: str) -> httpx.Response:
+            payload["model"] = model_to_use
+            with httpx.Client(timeout=60.0) as client:
+                return client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+
+        resp = _do_request(model)
+        # OmniRoute combo fallback: 401/404 on custom combo → retry with fallback
+        if (
+            provider == "omniroute"
+            and resp.status_code in (401, 404)
+            and model != OMNIROUTE_DEFAULT_COMBO_FALLBACK
+        ):
+            resp = _do_request(OMNIROUTE_DEFAULT_COMBO_FALLBACK)
+
+        if resp.status_code != 200:
+            raise LLMError(f"{provider} API returned {resp.status_code}: {resp.text[:300]}")
             # Defensive parsing — strip any leading "data: " prefixes
             # from SSE that some gateways leak through.
             text = resp.text
