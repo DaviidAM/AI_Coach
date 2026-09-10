@@ -75,11 +75,14 @@ services:
       args:
         # Baked into the JS bundle at build time. Override via .env or
         # the shell: NEXT_PUBLIC_API_URL=https://api.example.com docker compose build
-        # The host-side port for the backend is 18100 (see PORT-REGISTRY.md),
-        # but inside the Docker network the backend is reachable at
-        # http://backend:8091 — that's what the browser-facing bundle
-        # needs, not the host port. So default to the in-network URL.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8091}
+        #
+        # Default: empty string. This makes the frontend use same-origin
+        # relative URLs (`fetch("/api/chat")` instead of
+        # `fetch("http://backend:8091/api/chat")`), which work whether the
+        # app is accessed via https://ai_coach.daviidam.tech from a browser
+        # or http://localhost:18101 in local dev. The Next.js rewrites in
+        # next.config.js forward /api/* to the backend container.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     image: ai-coach-frontend:local
     container_name: ai-coach-frontend
     restart: unless-stopped
@@ -87,10 +90,10 @@ services:
     ports:
       - "${FRONTEND_PORT:-18101}:3000"
     # No extra_hosts needed on the frontend: it talks to the backend via
-    # the compose-internal DNS name 'backend' (see NEXT_PUBLIC_API_URL
-    # and the rewrites in next.config.js).
+    # the compose-internal DNS name 'backend' (see the Next.js rewrites
+    # in next.config.js).
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://backend:8091}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-}
       - PORT=3000
     depends_on:
       backend:
