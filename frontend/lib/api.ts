@@ -1,6 +1,12 @@
 import { Level } from '@/types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// IMPORTANT: do NOT default to 'http://localhost:8000' (or any localhost URL).
+// That URL is the user's machine when the bundle runs in their browser, not
+// the VPS hosting the backend. The frontend should use same-origin relative
+// URLs so the Next.js rewrites in next.config.js can forward /api/* to the
+// backend container. Setting an empty default ensures the browser calls
+// '/api/...' which the rewrite then proxies.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ''
 
 export interface Correction {
   id?: string
