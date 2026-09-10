@@ -16,7 +16,10 @@ const nextConfig = {
     return [
       { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },
       { source: "/ws/:path*", destination: `${backendUrl}/ws/:path*` },
-      { source: "/audio/:path*", destination: `${backendUrl}/audio/:path*` },
+      // The backend mounts its static dir at /static; audio files live
+      // under /static/audio/. The frontend (lib/api.ts audioUrl) builds
+      // URLs like "/audio/", so rewrite /audio/* → /static/audio/*.
+      { source: "/audio/:path*", destination: `${backendUrl}/static/audio/:path*` },
     ];
   },
 };

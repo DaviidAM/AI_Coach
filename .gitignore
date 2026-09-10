@@ -8,6 +8,7 @@ __pycache__/
 backend/app/static/audio/*.mp3
 backend/app/static/audio/*.wav
 backend/app/static/audio/*.webm
+backend/app/static/audio/stt/
 backend/static/audio/*.mp3
 backend/static/audio/stt/
 !backend/app/static/audio/.gitkeep
