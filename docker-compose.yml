@@ -7,6 +7,12 @@
 #   - backend  → Dockerfile.backend  → FastAPI on :8091
 #   - frontend → Dockerfile.frontend → Next.js on :3000
 #
+# Host port allocation (see ~/Hermes/repos/PORT-REGISTRY.md for the
+# full registry):
+#   - backend  host port 18100 → container 8091
+#   - frontend host port 18101 → container 3000
+# Range 18xxx reserved for the AI Coach family.
+#
 # Both services share the same source tree (context: .) but each one
 # has its own Dockerfile because the build/runtime images are
 # different (Python+slim vs Node).
@@ -26,8 +32,10 @@ services:
     image: ai-coach-backend:local
     container_name: ai-coach-backend
     restart: unless-stopped
+    # Host 18100 → container 8091. See PORT-REGISTRY.md for the
+    # port allocation convention (range 18xxx = AI Coach family).
     ports:
-      - "${BACKEND_PORT:-8091}:8091"
+      - "${BACKEND_PORT:-18100}:8091"
     environment:
       - PORT=8091
       # OmniRoute gateway — see README "Configuration > Backend" for the
@@ -58,14 +66,19 @@ services:
       args:
         # Baked into the JS bundle at build time. Override via .env or
         # the shell: NEXT_PUBLIC_API_URL=https://api.example.com docker compose build
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8091}
+        # The host-side port for the backend is 18100 (see PORT-REGISTRY.md),
+        # but inside the Docker network the backend is reachable at
+        # http://backend:8091 — that's what the browser-facing bundle
+        # needs, not the host port. So default to the in-network URL.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8091}
     image: ai-coach-frontend:local
     container_name: ai-coach-frontend
     restart: unless-stopped
+    # Host 18101 → container 3000. See PORT-REGISTRY.md.
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-18101}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8091}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://backend:8091}
       - PORT=3000
     depends_on:
       backend:
