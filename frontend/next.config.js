@@ -16,9 +16,11 @@ const nextConfig = {
     return [
       { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },
       { source: "/ws/:path*", destination: `${backendUrl}/ws/:path*` },
-      // The backend mounts its static dir at /static; audio files live
-      // under /static/audio/. The frontend (lib/api.ts audioUrl) builds
-      // URLs like "/audio/", so rewrite /audio/* → /static/audio/*.
+      // The backend serves audio files at /static/audio/. The frontend
+      // receives URLs like "/static/audio/foo.mp3" from the backend response
+      // (the backend doesn't strip the /static prefix) so we proxy both
+      // the legacy /audio/* path and the actual /static/audio/* path.
+      { source: "/static/audio/:path*", destination: `${backendUrl}/static/audio/:path*` },
       { source: "/audio/:path*", destination: `${backendUrl}/static/audio/:path*` },
     ];
   },
