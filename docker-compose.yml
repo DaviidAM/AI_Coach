@@ -36,6 +36,15 @@ services:
     # port allocation convention (range 18xxx = AI Coach family).
     ports:
       - "${BACKEND_PORT:-18100}:8091"
+    # Coolify puts each app in its own private Docker network where
+    # 'host.docker.internal' is NOT defined by default. We have to map
+    # it explicitly to the network gateway so the backend can reach
+    # the systemd OmniRoute service running on the host port 20128.
+    # The gateway IP is the .1 address of the bridge network (we use
+    # 'host-gateway' which Docker resolves to the actual host gateway
+    # on Linux >= 20.10).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - PORT=8091
       # OmniRoute gateway — see README "Configuration > Backend" for the
@@ -77,6 +86,9 @@ services:
     # Host 18101 → container 3000. See PORT-REGISTRY.md.
     ports:
       - "${FRONTEND_PORT:-18101}:3000"
+    # No extra_hosts needed on the frontend: it talks to the backend via
+    # the compose-internal DNS name 'backend' (see NEXT_PUBLIC_API_URL
+    # and the rewrites in next.config.js).
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://backend:8091}
       - PORT=3000
