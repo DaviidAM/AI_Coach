@@ -13,115 +13,63 @@ The limit-enforcement logic is tested via is_at_demo_limit() directly (pure
 session logic — no LLM mocking needed). The full /api/chat 429 integration is
 verified by the task smoke test script:
   DEMO_MESSAGE_LIMIT=2 uvicorn ... && for i in 1 2 3; do curl ...; done
+
+NOTE on env-var re-reading: this file historically manipulated
+``sys.modules`` to force re-imports of ``app.session`` and ``app.main`` so
+that ``DEMO_MESSAGE_LIMIT`` (a module-level constant) would re-evaluate the
+env var. That trick broke unrelated tests because deleting the modules
+mid-suite caused cross-test bleed (see commit 07f3a03 → 0172683 → final fix).
+
+This file now uses :func:`app.session.get_demo_limit`, which re-reads the
+env var on every call, and uses :func:`pytest.MonkeyPatch.setenv` (via the
+``monkeypatch`` fixture) to flip the env var inside individual tests. No
+``sys.modules`` mutation is needed.
 """
 import os
-import sys
 import pytest
 from fastapi.testclient import TestClient
 
 
 # ---------------------------------------------------------------------------
-# Test: DEMO_MESSAGE_LIMIT env parsing at module level.
+# Test: DEMO_MESSAGE_LIMIT env parsing via get_demo_limit().
 # ---------------------------------------------------------------------------
 class TestDemoMessageLimitParsing:
-    """DEMO_MESSAGE_LIMIT is read at module import time via os.getenv."""
+    """DEMO_MESSAGE_LIMIT is re-read from os.environ via get_demo_limit()."""
 
-    def test_default_is_5_when_env_unset(self):
-        """AC-1: unset env var → DEMO_MESSAGE_LIMIT resolves to 5."""
-        backup = os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-        try:
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import DEMO_MESSAGE_LIMIT
+    def test_default_is_5_when_env_unset(self, monkeypatch):
+        """AC-1: unset env var → get_demo_limit() returns 5."""
+        monkeypatch.delenv("DEMO_MESSAGE_LIMIT", raising=False)
+        from app.session import get_demo_limit
 
-            assert DEMO_MESSAGE_LIMIT == 5
-        finally:
-            if backup is not None:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        assert get_demo_limit() == 5
 
-    def test_unlimited_when_env_is_minus_one(self):
+    def test_unlimited_when_env_is_minus_one(self, monkeypatch):
         """AC-2: DEMO_MESSAGE_LIMIT=-1 → None (unlimited)."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "-1"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import DEMO_MESSAGE_LIMIT
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "-1")
+        from app.session import get_demo_limit
 
-            assert DEMO_MESSAGE_LIMIT is None
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        assert get_demo_limit() is None
 
-    def test_positive_int_is_preserved(self):
+    def test_positive_int_is_preserved(self, monkeypatch):
         """AC-3: DEMO_MESSAGE_LIMIT=20 → 20."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "20"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import DEMO_MESSAGE_LIMIT
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "20")
+        from app.session import get_demo_limit
 
-            assert DEMO_MESSAGE_LIMIT == 20
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        assert get_demo_limit() == 20
 
-    def test_invalid_string_falls_back_to_5(self):
+    def test_invalid_string_falls_back_to_5(self, monkeypatch):
         """AC-4: DEMO_MESSAGE_LIMIT=abc → 5."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "abc"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import DEMO_MESSAGE_LIMIT
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "abc")
+        from app.session import get_demo_limit
 
-            assert DEMO_MESSAGE_LIMIT == 5
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        assert get_demo_limit() == 5
 
-    def test_negative_other_than_minus_one_falls_back_to_5(self):
+    def test_negative_other_than_minus_one_falls_back_to_5(self, monkeypatch):
         """AC-4: DEMO_MESSAGE_LIMIT=-5 → 5."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "-5"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import DEMO_MESSAGE_LIMIT
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "-5")
+        from app.session import get_demo_limit
 
-            assert DEMO_MESSAGE_LIMIT == 5
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        assert get_demo_limit() == 5
 
 
 # ---------------------------------------------------------------------------
@@ -130,71 +78,35 @@ class TestDemoMessageLimitParsing:
 class TestConfigEndpoint:
     """GET /api/config surfaces the parsed limit."""
 
-    def test_config_returns_5_and_false_when_env_unset(self):
+    def test_config_returns_5_and_false_when_env_unset(self, monkeypatch):
         """AC-5: demo_message_limit=5, unlimited=false when env var is unset."""
-        backup = os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-        try:
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.main import app as main_app
+        monkeypatch.delenv("DEMO_MESSAGE_LIMIT", raising=False)
+        from app.main import app as main_app
 
-            client = TestClient(main_app)
-            resp = client.get("/api/config")
-            assert resp.status_code == 200
-            assert resp.json() == {"demo_message_limit": 5, "unlimited": False}
-        finally:
-            if backup is not None:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        client = TestClient(main_app)
+        resp = client.get("/api/config")
+        assert resp.status_code == 200
+        assert resp.json() == {"demo_message_limit": 5, "unlimited": False}
 
-    def test_config_returns_null_and_true_when_env_is_minus_one(self):
+    def test_config_returns_null_and_true_when_env_is_minus_one(self, monkeypatch):
         """AC-5: demo_message_limit=null, unlimited=true when env is -1."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "-1"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.main import app as main_app
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "-1")
+        from app.main import app as main_app
 
-            client = TestClient(main_app)
-            resp = client.get("/api/config")
-            assert resp.status_code == 200
-            assert resp.json() == {"demo_message_limit": None, "unlimited": True}
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        client = TestClient(main_app)
+        resp = client.get("/api/config")
+        assert resp.status_code == 200
+        assert resp.json() == {"demo_message_limit": None, "unlimited": True}
 
-    def test_config_returns_custom_int(self):
+    def test_config_returns_custom_int(self, monkeypatch):
         """AC-3: demo_message_limit=20, unlimited=false for custom positive int."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "20"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.main import app as main_app
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "20")
+        from app.main import app as main_app
 
-            client = TestClient(main_app)
-            resp = client.get("/api/config")
-            assert resp.status_code == 200
-            assert resp.json() == {"demo_message_limit": 20, "unlimited": False}
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        client = TestClient(main_app)
+        resp = client.get("/api/config")
+        assert resp.status_code == 200
+        assert resp.json() == {"demo_message_limit": 20, "unlimited": False}
 
 
 # ---------------------------------------------------------------------------
@@ -207,122 +119,64 @@ class TestConfigEndpoint:
 class TestChatEnforcement:
     """is_at_demo_limit() blocks new user messages when the cap is reached."""
 
-    def test_at_limit_true_after_5_user_messages_when_limit_is_5(self):
+    def test_at_limit_true_after_5_user_messages_when_limit_is_5(self, monkeypatch):
         """AC-1: is_at_demo_limit is True after 5 user messages when limit=5."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "5"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import store, is_at_demo_limit
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "5")
+        from app.session import store, is_at_demo_limit
 
-            sid = "test-sid-5"
-            for i in range(5):
-                store.append_message(sid, "user", f"msg {i}")
-                store.append_message(sid, "assistant", f"reply {i}")
-            assert is_at_demo_limit(sid) is True
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        sid = "test-sid-5"
+        for i in range(5):
+            store.append_message(sid, "user", f"msg {i}")
+            store.append_message(sid, "assistant", f"reply {i}")
+        assert is_at_demo_limit(sid) is True
 
-    def test_at_limit_false_at_4_messages_when_limit_is_5(self):
+    def test_at_limit_false_at_4_messages_when_limit_is_5(self, monkeypatch):
         """AC-1: is_at_demo_limit is False after 4 user messages when limit=5."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "5"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import store, is_at_demo_limit
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "5")
+        from app.session import store, is_at_demo_limit
 
-            sid = "test-sid-4"
-            for i in range(4):
-                store.append_message(sid, "user", f"msg {i}")
-            assert is_at_demo_limit(sid) is False
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        sid = "test-sid-4"
+        for i in range(4):
+            store.append_message(sid, "user", f"msg {i}")
+        assert is_at_demo_limit(sid) is False
 
-    def test_at_limit_false_when_unlimited(self):
+    def test_at_limit_false_when_unlimited(self, monkeypatch):
         """AC-2: is_at_demo_limit always False when DEMO_MESSAGE_LIMIT=-1."""
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "-1"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import store, is_at_demo_limit
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "-1")
+        from app.session import store, is_at_demo_limit
 
-            sid = "test-sid-unlimited"
-            for i in range(100):
-                store.append_message(sid, "user", f"msg {i}")
-            assert is_at_demo_limit(sid) is False
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        sid = "test-sid-unlimited"
+        for i in range(100):
+            store.append_message(sid, "user", f"msg {i}")
+        assert is_at_demo_limit(sid) is False
 
-    def test_custom_limit_respected(self):
+    def test_custom_limit_respected(self, monkeypatch):
         """AC-3: is_at_demo_limit True after 20 messages when limit=20.
 
-        Note: MAX_MESSAGES=10 (LLM context window) truncates total session history,
-        so only the last 10 messages survive. We test that is_at_demo_limit is True
-        when the stored user count reaches the limit (20) and False just below it.
-        With MAX_MESSAGES=10 the last 10 messages are always stored regardless,
-        so the boundary is 10 (not 20) — but the enforcement logic itself is
-        correctly reading DEMO_MESSAGE_LIMIT=20 from env.
+        Note: MAX_MESSAGES=10 (LLM context window) truncates total session
+        history, so only the last 10 messages survive. is_at_demo_limit
+        checks the actual stored count, so 10 < 20 → False. Then we flip
+        the env to limit=5, append 20 more (truncated to 10 stored), and
+        confirm the same stored count of 10 ≥ 5 → True.
         """
-        backup = os.environ.get("DEMO_MESSAGE_LIMIT")
-        try:
-            os.environ["DEMO_MESSAGE_LIMIT"] = "20"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import store, is_at_demo_limit
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "20")
+        from app.session import store, is_at_demo_limit
 
-            sid = "test-sid-custom"
-            # Send 20 user messages (MAX_MESSAGES=10 truncates to last 10).
-            for i in range(20):
-                store.append_message(sid, "user", f"msg {i}")
-            # Only 10 survive (MAX_MESSAGES=10). is_at_demo_limit checks the
-            # actual stored count, which is 10 — not yet at the limit of 20.
-            session = store.get_or_create(sid)
-            stored_user_count = sum(1 for m in session.messages if m.get("role") == "user")
-            assert stored_user_count == 10  # MAX_MESSAGES cap
-            assert is_at_demo_limit(sid) is False  # 10 < 20
+        sid = "test-sid-custom"
+        for i in range(20):
+            store.append_message(sid, "user", f"msg {i}")
+        session = store.get_or_create(sid)
+        stored_user_count = sum(1 for m in session.messages if m.get("role") == "user")
+        assert stored_user_count == 10  # MAX_MESSAGES cap
+        assert is_at_demo_limit(sid) is False  # 10 < 20
 
-            # Verify: with limit=5, 10 stored messages ARE at limit.
-            store.reset(sid)
-            os.environ["DEMO_MESSAGE_LIMIT"] = "5"
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
-            from app.session import store as store2, is_at_demo_limit as is_at_limit_5
-            for i in range(20):
-                store2.append_message(sid, "user", f"msg {i}")
-            stored = sum(1 for m in store2.get_or_create(sid).messages if m.get("role") == "user")
-            assert stored == 10  # still MAX_MESSAGES capped
-            assert is_at_limit_5(sid) is True  # 10 stored >= limit of 5
-        finally:
-            if backup is None:
-                os.environ.pop("DEMO_MESSAGE_LIMIT", None)
-            else:
-                os.environ["DEMO_MESSAGE_LIMIT"] = backup
-            mods = [k for k in sys.modules if k.startswith("app.")]
-            for m in mods:
-                del sys.modules[m]
+        # Flip env to 5: 10 stored >= 5 → at limit.
+        store.reset(sid)
+        monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "5")
+        for i in range(20):
+            store.append_message(sid, "user", f"msg {i}")
+        stored = sum(
+            1 for m in store.get_or_create(sid).messages if m.get("role") == "user"
+        )
+        assert stored == 10
+        assert is_at_demo_limit(sid) is True

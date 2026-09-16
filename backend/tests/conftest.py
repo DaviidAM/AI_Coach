@@ -82,36 +82,20 @@ def isolate_audio_dirs(tmp_path, monkeypatch):
 # can mask bugs rather than expose them.
 
 
-@pytest.fixture(autouse=True)
-def _mock_llm_http():
-    """
-    Default mock for LLM HTTP calls — returns a safe stub so tests that call
-    /api/chat without explicitly mocking the LLM don't hit the network.
-
-    This patches httpx.Client in app.llm so that:
-    - Tests that patch httpx.Client directly (e.g. test_combo_fallback.py) can
-      still override this by patching AFTER this fixture's patch.
-    - Tests that patch get_llm_reply directly also work (their patch takes precedence).
-    - Tests that do neither get a safe no-op stub.
-    """
-    import httpx
-    from unittest.mock import patch
-
-    # Capture real Client BEFORE patching so we can call it inside the mock
-    _RealClient = httpx.Client
-
-    safe_response = httpx.Response(
-        200,
-        json={"choices": [{"message": {"content": '{"reply":"Sure.","corrections":[]}'}}]},
-    )
-    mock_transport = httpx.MockTransport(lambda request: safe_response)
-
-    def mock_client(*args, **kwargs):
-        kwargs.setdefault("transport", mock_transport)
-        return _RealClient(*args, **kwargs)
-
-    with patch("app.llm.httpx.Client", side_effect=mock_client):
-        yield
+# NOTE: An earlier version of this conftest had an autouse `_mock_llm_http`
+# fixture that patched app.llm.httpx.Client globally with a MockTransport
+# returning a stub OpenAI-style response. That broke unrelated tests
+# (e.g. test_stt_tts.py::TestTranscribe::test_transcribe_uses_base_model_cpu
+# fell through to huggingface_hub which interpreted the stub payload as
+# ModelInfo kwargs) because the MockTransport intercepted *every* httpx
+# request, not only LLM calls.
+#
+# The fix is to NOT auto-mock the LLM. Tests that exercise /api/chat
+# already patch what they need (app.api.chat.transcribe / .synthesize, or
+# directly app.llm.get_llm_reply) on a per-test basis. If a future test
+# genuinely needs a default LLM stub without explicit patching, add a
+# NON-autouse fixture named e.g. `default_llm_stub` and request it in
+# that one test only.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

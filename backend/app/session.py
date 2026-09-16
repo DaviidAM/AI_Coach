@@ -51,17 +51,35 @@ def _parse_demo_message_limit() -> Optional[int]:
 DEMO_MESSAGE_LIMIT: Optional[int] = _parse_demo_message_limit()  # int or None (=unlimited)
 
 
+def get_demo_limit() -> Optional[int]:
+    """Re-read DEMO_MESSAGE_LIMIT from the current environment and return it.
+
+    Unlike the module-level ``DEMO_MESSAGE_LIMIT`` constant (which is captured
+    once at import time), this function re-evaluates the env var on every
+    call. Tests that need to assert behaviour for different env values should
+    use this function instead of the constant, and pair it with
+    ``monkeypatch.setenv()`` instead of editing ``sys.modules`` directly.
+
+    Returns ``None`` for unlimited, a positive ``int`` otherwise.
+    """
+    return _parse_demo_message_limit()
+
+
 def is_at_demo_limit(session_id: str) -> bool:
     """Return True when the next user message would exceed DEMO_MESSAGE_LIMIT.
 
-    Always returns False when DEMO_MESSAGE_LIMIT is None (unlimited).
+    Always returns False when the limit is None (unlimited).
+
+    Reads the limit lazily via ``get_demo_limit()`` so that tests can change
+    the env var between requests without reimporting the module.
     """
-    if DEMO_MESSAGE_LIMIT is None:
+    limit = get_demo_limit()
+    if limit is None:
         return False
     session = get_store().get_or_create(session_id)
     with session.lock:
         user_count = sum(1 for m in session.messages if m.get("role") == "user")
-    return user_count >= DEMO_MESSAGE_LIMIT
+    return user_count >= limit
 
 
 from app.llm import DEFAULT_SETTINGS
