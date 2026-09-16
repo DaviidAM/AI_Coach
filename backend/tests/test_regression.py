@@ -93,12 +93,11 @@ class TestConversationSummary:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestSavedRecordings:
-    def test_audio_chat_saves_original_recording(self):
+    def test_audio_chat_saves_original_recording(self, isolate_audio_dirs):
         """When audio is sent, the raw recording should be saved to static/audio/stt/."""
-        from app.api.chat import STT_DIR
+        from app.api.chat import get_stt_dir
 
-        test_uuid_prefix = "test-recording-"
-        expected_pattern = STT_DIR / f"{test_uuid_prefix}*.webm"
+        stt_dir = get_stt_dir()
 
         # Build a minimal fake WAV to satisfy the audio content-type check
         fake_audio = b"RIFF$\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00@\x1f\x00\x00d\x18\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
@@ -120,17 +119,17 @@ class TestSavedRecordings:
         assert data["user_audio_url"] is not None
         assert "/static/audio/stt/stt_" in data["user_audio_url"]
 
-        # Verify the file actually exists on disk
+        # Verify the file actually exists on disk (in the isolated tmp dir)
         audio_url = data["user_audio_url"]
-        # URL is like /static/audio/stt/stt_<uuid>.webm → relative path static/audio/stt/stt_<uuid>.webm
         rel_path = audio_url.lstrip("/")  # "static/audio/stt/stt_xxx.webm"
-        audio_path = Path("app") / rel_path
+        filename = rel_path.replace("static/audio/stt/", "")
+        audio_path = stt_dir / filename
         assert audio_path.exists(), f"Expected saved recording at {audio_path.resolve()}"
         # Clean up
         if audio_path.exists():
             audio_path.unlink()
 
-    def test_text_chat_does_not_create_stt_file(self):
+    def test_text_chat_does_not_create_stt_file(self, isolate_audio_dirs):
         """Text-only chat should not create anything under static/audio/stt/."""
         import uuid
         sid = f"test-text-only-{uuid.uuid4()}"

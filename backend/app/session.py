@@ -58,13 +58,14 @@ def is_at_demo_limit(session_id: str) -> bool:
     """
     if DEMO_MESSAGE_LIMIT is None:
         return False
-    session = store.get_or_create(session_id)
+    session = get_store().get_or_create(session_id)
     with session.lock:
         user_count = sum(1 for m in session.messages if m.get("role") == "user")
     return user_count >= DEMO_MESSAGE_LIMIT
 
 
 from app.llm import DEFAULT_SETTINGS
+
 
 class SessionData:
     def __init__(self):
@@ -137,5 +138,18 @@ class SessionStore:
         msgs = self.get_messages(session_id)
         return [{"role": m["role"], "content": m["text"]} for m in msgs]
 
+    def reset_all(self) -> None:
+        """Clear all sessions. Used by test fixtures to prevent cross-test bleed."""
+        with self._lock:
+            self._sessions.clear()
 
+
+# Module-level singleton. Exposed via a getter so that code that imports `store`
+# at module level (e.g. app.llm) always gets the current instance, even if
+# sys.modules is flushed and reimported (as test_message_limit.py does).
 store = SessionStore()
+
+
+def get_store() -> SessionStore:
+    """Return the current store singleton. Used by app.llm to avoid stale refs."""
+    return store

@@ -8,7 +8,7 @@ import io
 from app import stt as stt_module
 from app import tts as tts_module
 from app.main import app
-from app.api.chat import AUDIO_DIR
+from app.api.chat import get_audio_dir
 from httpx import AsyncClient, ASGITransport
 
 
@@ -207,7 +207,7 @@ class TestChatAudioResponse:
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path):
         """Patch STT, TTS, and LLM; ensure audio dir exists."""
-        self.audio_dir = AUDIO_DIR
+        self.audio_dir = get_audio_dir()
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
         self.mock_transcribe = patch("app.api.chat.transcribe").start()
@@ -386,7 +386,7 @@ class TestTTSPath:
 
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path):
-        self.audio_dir = AUDIO_DIR
+        self.audio_dir = get_audio_dir()
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.mock_transcribe = patch("app.api.chat.transcribe").start()
         self.mock_get_llm_reply = patch("app.api.chat.get_llm_reply").start()

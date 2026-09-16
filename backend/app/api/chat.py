@@ -16,10 +16,18 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 # Files written here are served at /static/audio/...
 # Path is anchored to this file's directory (app/api/), so it matches
 # the static dir mounted by app/main.py (app/static/).
-AUDIO_DIR = Path(__file__).parent.parent / "static" / "audio"
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-STT_DIR = AUDIO_DIR / "stt"
-STT_DIR.mkdir(parents=True, exist_ok=True)
+_AUDIO_DIR = Path(__file__).parent.parent / "static" / "audio"
+_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+_STT_DIR = _AUDIO_DIR / "stt"
+_STT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Allow test fixtures to override these paths via monkeypatching.
+# Production code uses the module-level defaults above.
+def get_audio_dir():
+    return _AUDIO_DIR
+
+def get_stt_dir():
+    return _STT_DIR
 
 
 _MIME_EXT = {
@@ -77,7 +85,7 @@ async def chat(
         # Save the original user recording to disk (cherry-pick from old Gradio code)
         user_uuid = uuid.uuid4()
         ext = _ext_for_mime(audio.content_type)
-        saved_path = STT_DIR / f"stt_{user_uuid}.{ext}"
+        saved_path = get_stt_dir() / f"stt_{user_uuid}.{ext}"
         with open(saved_path, "wb") as f:
             f.write(audio_bytes)
         user_audio_url = f"/static/audio/stt/stt_{user_uuid}.{ext}"
@@ -91,7 +99,7 @@ async def chat(
         # message so the user can hear it played back AND the COACH's audio
         # has uniform context. Saves to /static/audio/<uuid>.mp3.
         user_uuid = uuid.uuid4()
-        user_audio_path = AUDIO_DIR / f"{user_uuid}.mp3"
+        user_audio_path = get_audio_dir() / f"{user_uuid}.mp3"
         await synthesize(user_text or "", user_audio_path)
         user_audio_url = f"/static/audio/{user_uuid}.mp3"
 
@@ -130,7 +138,7 @@ async def chat(
 
     # Synthesize TTS for coach reply (always, even for text-only input)
     coach_uuid = uuid.uuid4()
-    coach_audio_path = AUDIO_DIR / f"{coach_uuid}.mp3"
+    coach_audio_path = get_audio_dir() / f"{coach_uuid}.mp3"
     try:
         await synthesize(coach_text, coach_audio_path)
     except Exception as e:
