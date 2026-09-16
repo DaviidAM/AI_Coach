@@ -64,13 +64,54 @@ def isolate_audio_dirs(tmp_path, monkeypatch):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-4: HTTP mock isolation
+# FR-4: LLM mock isolation
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Provide a default get_llm_reply mock for all tests that call the /api/chat
+# endpoint.  Tests that need specific LLM responses can override this by
+# patching get_llm_reply directly in their own test or fixture.
+#
+# This autouse fixture is intentionally a no-op — it just lets tests that
+# don't patch get_llm_reply fall through without hitting a real HTTP call.
+# Tests that DO patch get_llm_reply take precedence because the patch is
+# applied after the autouse fixture's mock.
+#
 # NOTE: Tests that manipulate os.environ (test_message_limit.py,
 # test_combo_fallback.py, test_env_overrides.py) are responsible for their
 # own cleanup. Conftest does not blanket-reset env vars because doing so
 # can mask bugs rather than expose them.
+
+
+@pytest.fixture(autouse=True)
+def _mock_llm_http():
+    """
+    Default mock for LLM HTTP calls — returns a safe stub so tests that call
+    /api/chat without explicitly mocking the LLM don't hit the network.
+
+    This patches httpx.Client in app.llm so that:
+    - Tests that patch httpx.Client directly (e.g. test_combo_fallback.py) can
+      still override this by patching AFTER this fixture's patch.
+    - Tests that patch get_llm_reply directly also work (their patch takes precedence).
+    - Tests that do neither get a safe no-op stub.
+    """
+    import httpx
+    from unittest.mock import patch
+
+    # Capture real Client BEFORE patching so we can call it inside the mock
+    _RealClient = httpx.Client
+
+    safe_response = httpx.Response(
+        200,
+        json={"choices": [{"message": {"content": '{"reply":"Sure.","corrections":[]}'}}]},
+    )
+    mock_transport = httpx.MockTransport(lambda request: safe_response)
+
+    def mock_client(*args, **kwargs):
+        kwargs.setdefault("transport", mock_transport)
+        return _RealClient(*args, **kwargs)
+
+    with patch("app.llm.httpx.Client", side_effect=mock_client):
+        yield
 
 
 # ─────────────────────────────────────────────────────────────────────────────
