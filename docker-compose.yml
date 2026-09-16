@@ -47,6 +47,12 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       - PORT=8091
+      # Demo message limit (user-facing cap, NOT the LLM context window).
+      #   5          → demo mode, 5 user messages per session (default)
+      #   -1         → unlimited (AACoach deployment, demo mode disabled)
+      #   any other positive int → custom cap
+      # Changing this requires a redeploy: docker compose up -d --build
+      - DEMO_MESSAGE_LIMIT=${DEMO_MESSAGE_LIMIT:-5}
       # OmniRoute gateway — see README "Configuration > Backend" for the
       # full reference. Defaults below match the documented behaviour when
       # no env override is set.

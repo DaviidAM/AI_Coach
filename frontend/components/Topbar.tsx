@@ -38,7 +38,7 @@ export function Topbar({
   errorCount?: number
   onOpenErrors?: () => void
   messageCount?: number
-  messageLimit?: number
+  messageLimit?: number | null
 }) {
   const [level, setLevelState] = useState<Level>('A2')
   const [theme, setThemeState] = useState<Theme>('dark')
@@ -117,7 +117,7 @@ export function Topbar({
 
       <div className={styles.center}>
         <span className={styles.lang}>Demo Version</span>
-        {messageCount !== undefined && messageLimit !== undefined && (
+        {messageCount !== undefined && messageLimit != null && (
           <>
             <span className={styles.demoCounter}>
               {Math.min(messageCount, messageLimit)} of {messageLimit} demo messages used

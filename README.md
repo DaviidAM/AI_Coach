@@ -82,6 +82,7 @@ OpenAI-compatible chat-completions endpoint through OmniRoute's gateway.
 | `OMNIROUTE_API_KEY` | no | _(empty)_ | Bearer token sent in `Authorization` header. Most self-hosted gateways don't require one; leave unset if your gateway accepts anonymous requests. |
 | `OMNIROUTE_DEFAULT_MODEL` | no | `auto/best-chat` | Combo or model name used for new sessions. Accepts any value that resolves on the gateway: OmniRoute predefined combos (`auto/best-coding`, `auto/cheap`, `auto/pro-coding`, …), provider/model strings (`minimax/MiniMax-M2.7-highspeed`, `nvidia/meta/llama-3.3-70b-instruct`, `openrouter/anthropic/claude-3.5-sonnet`, …), or your own custom combos (e.g. `primary-chain`). |
 | `OMNIROUTE_DEFAULT_COMBO_FALLBACK` | no | `primary-chain` | Used automatically when the first request returns 401/404 (e.g. a custom combo that doesn't exist on the gateway, or a model the active provider rejected). The client retries once with this model before surfacing the error to the user. |
+| `DEMO_MESSAGE_LIMIT` | no | `5` | Maximum user messages per session in demo mode. After the limit is reached the UI disables input and the backend returns HTTP 429. Set to `-1` for unlimited (AACoach deployment). Any other positive integer sets a custom cap. Changing this requires a redeploy (`docker compose up -d --build`). |
 
 #### Choosing a model / combo at runtime
 

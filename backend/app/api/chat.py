@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.models import ChatResponse, Correction
 from app.llm import get_llm_reply, LLMError
-from app.session import store
+from app.session import store, is_at_demo_limit
 from app.filter import filter_corrections
 from app.stt import transcribe
 from app.tts import synthesize
@@ -98,8 +98,10 @@ async def chat(
     # Get user level
     level = store.get_level(session_id)
 
-    # Append user message to session
+    # Append user message to session — enforce demo limit BEFORE appending
     if user_text:
+        if is_at_demo_limit(session_id):
+            raise HTTPException(status_code=429, detail="Demo message limit reached")
         store.append_message(session_id, "user", user_text)
 
     # Get history for LLM
