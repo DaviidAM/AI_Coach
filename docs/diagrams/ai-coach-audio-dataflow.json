@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "AI Coach — Audio Data Flow",
+    "output": "ai-coach-audio-dataflow.html",
+    "viewBox": [1080, 460],
+    "animation": "trace",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "full-pipeline",
+        "label": "Full pipeline",
+        "focus": ["browser_mic", "fastapi", "stt", "llm", "tts", "audio_dir", "browser_play"],
+        "note": "Audio bytes from mic capture through STT to coach reply audio playback."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Capture" },
+    { "label": "API / STT" },
+    { "label": "LLM + TTS" },
+    { "label": "Store / Playback" }
+  ],
+  "nodes": [
+    {
+      "id": "browser_mic",
+      "type": "frontend",
+      "label": "Browser mic",
+      "sublabel": "MediaRecorder API",
+      "stage": 0,
+      "row": 0
+    },
+    {
+      "id": "fastapi",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "/api/chat",
+      "stage": 1,
+      "row": 0
+    },
+    {
+      "id": "stt",
+      "type": "backend",
+      "label": "faster-whisper STT",
+      "sublabel": "transcribe()",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "llm",
+      "type": "backend",
+      "label": "LLM",
+      "sublabel": "get_llm_reply()",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "tts",
+      "type": "backend",
+      "label": "edge-tts TTS",
+      "sublabel": "synthesize()",
+      "stage": 2,
+      "row": 1
+    },
+    {
+      "id": "audio_dir",
+      "type": "database",
+      "label": "Audio dir",
+      "sublabel": "/static/audio/*.mp3",
+      "stage": 3,
+      "row": 0
+    },
+    {
+      "id": "browser_play",
+      "type": "frontend",
+      "label": "Browser <audio>",
+      "sublabel": "plays coach reply",
+      "stage": 3,
+      "row": 1
+    }
+  ],
+  "flows": [
+    {
+      "id": "mic-capture",
+      "from": "browser_mic",
+      "to": "fastapi",
+      "label": "audio/webm",
+      "classification": "user speech",
+      "variant": "emphasis"
+    },
+    {
+      "id": "transcribe",
+      "from": "fastapi",
+      "to": "stt",
+      "label": "audio bytes",
+      "classification": "process",
+      "variant": "emphasis",
+      "labelDy": 30
+    },
+    {
+      "id": "text-to-llm",
+      "from": "stt",
+      "to": "llm",
+      "label": "transcribed text",
+      "classification": "process",
+      "variant": "emphasis",
+      "labelDy": -24
+    },
+    {
+      "id": "llm-to-tts",
+      "from": "llm",
+      "to": "tts",
+      "label": "coach reply text",
+      "classification": "process",
+      "variant": "emphasis",
+      "labelDy": 30
+    },
+    {
+      "id": "tts-write",
+      "from": "tts",
+      "to": "audio_dir",
+      "label": "coach .mp3",
+      "classification": "persistent",
+      "variant": "default",
+      "labelDy": 30
+    },
+    {
+      "id": "playback",
+      "from": "audio_dir",
+      "to": "browser_play",
+      "label": "GET /static/audio/*.mp3",
+      "classification": "playback",
+      "variant": "emphasis",
+      "labelDy": 30
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "STT pipeline",
+      "items": [
+        "Browser MediaRecorder records audio → POSTs multipart to /api/chat",
+        "FastAPI saves original .webm to /static/audio/stt/ (ephemeral, janitor cleans)",
+        "faster-whisper transcribes (base model, CPU, int8)"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "TTS pipeline",
+      "items": [
+        "Coach reply text → edge-tts (en-US-AriaNeural) → .mp3 file",
+        "MP3 saved to /static/audio/ (persistent via Docker volume)",
+        "Browser fetches GET /static/audio/*.mp3 and plays it"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Data lifecycle",
+      "items": [
+        "User .webm files: ephemeral — audio janitor removes periodically",
+        "Coach .mp3 files: persistent — survive FastAPI restart",
+        "SessionStore: in-memory only — lost on restart"
+      ]
+    }
+  ]
+}

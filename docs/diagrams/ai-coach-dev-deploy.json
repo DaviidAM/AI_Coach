@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Coach — Docker Compose Dev Topology",
+    "output": "ai-coach-dev-deploy.html",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "full-deploy",
+        "label": "Full deploy",
+        "focus": ["host", "frontend", "backend", "omniroute", "audio_vol", "audio_stt_vol"],
+        "note": "docker-compose topology on VPS: services, ports, and volumes."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "host",
+      "type": "external",
+      "label": "Host / VPS",
+      "sublabel": "Coolify or native",
+      "pos": [40, 160],
+      "size": [110, 60]
+    },
+    {
+      "id": "omniroute",
+      "type": "cloud",
+      "label": "OmniRoute",
+      "sublabel": "systemd :20128",
+      "pos": [40, 420],
+      "size": [110, 60]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Next.js",
+      "sublabel": ":18101 → :3000",
+      "pos": [300, 160],
+      "size": [130, 60]
+    },
+    {
+      "id": "backend",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": ":18100 → :8091",
+      "pos": [560, 160],
+      "size": [130, 60]
+    },
+    {
+      "id": "audio_vol",
+      "type": "database",
+      "label": "ai-coach-audio",
+      "sublabel": "/static/audio/*.mp3",
+      "pos": [560, 340],
+      "size": [130, 60],
+      "tag": "Docker volume"
+    },
+    {
+      "id": "audio_stt_vol",
+      "type": "database",
+      "label": "ai-coach-audio-stt",
+      "sublabel": "/static/audio/stt/*.webm",
+      "pos": [560, 420],
+      "size": [130, 60],
+      "tag": "Docker volume"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Docker network (ai-coach-network)",
+      "wraps": ["frontend", "backend", "audio_vol", "audio_stt_vol"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Host ports",
+      "wraps": ["host", "omniroute"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "host-frontend",
+      "from": "host",
+      "to": "frontend",
+      "label": "HTTPS :18101",
+      "variant": "emphasis"
+    },
+    {
+      "id": "frontend-backend",
+      "from": "frontend",
+      "to": "backend",
+      "label": "/api/* rewrites → :8091",
+      "variant": "emphasis"
+    },
+    {
+      "id": "backend-omniroute",
+      "from": "backend",
+      "to": "omniroute",
+      "label": "host.docker.internal:20128",
+      "variant": "security"
+    },
+    {
+      "id": "backend-audio",
+      "from": "backend",
+      "to": "audio_vol",
+      "label": "write coach .mp3",
+      "labelDy": 30
+    },
+    {
+      "id": "backend-audio-stt",
+      "from": "backend",
+      "to": "audio_stt_vol",
+      "label": "write user .webm",
+      "labelDy": 50,
+      "via": [[625, 190], [740, 190], [740, 420]]
+    },
+    {
+      "id": "audio-frontend",
+      "from": "audio_vol",
+      "to": "frontend",
+      "label": "GET /static/audio/*.mp3",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Service topology",
+      "items": [
+        "Frontend (Next.js) on :18101, backend (FastAPI) on :18100",
+        "Next.js rewrites /api/* → backend container at :8091",
+        "backend reaches OmniRoute via host.docker.internal:20128"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Volumes",
+      "items": [
+        "ai-coach-audio: persists coach .mp3 across container restarts",
+        "ai-coach-audio-stt: persists user .webm files (cleaned by janitor)",
+        "Both bind-mounted to /app/backend/app/static/audio/"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Dev vs prod",
+      "items": [
+        "Dev: docker compose up -d --build from project root",
+        "Prod (Coolify): same docker-compose.yml, separate Git repo",
+        "OmniRoute runs as systemd service on host, not in a container"
+      ]
+    }
+  ]
+}
