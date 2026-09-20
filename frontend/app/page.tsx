@@ -17,7 +17,6 @@ import {
 import styles from './chat.module.css'
 
 const SESSION_KEY = 'ai-coach-session-id'
-const MESSAGES_LIMIT = 5
 
 function getStoredSessionId(): string {
   if (typeof window === 'undefined') return crypto.randomUUID()
@@ -40,7 +39,21 @@ export default function Home() {
   const [recording, setRecording] = useState(false)
 
   const userMessageCount = messages.filter((m) => m.role === 'user').length
-  const atLimit = userMessageCount >= MESSAGES_LIMIT
+  const [messageLimit, setMessageLimit] = useState<number | null>(5) // default fallback; fetched from /api/config on mount
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((cfg: { demo_message_limit: number | null; unlimited: boolean }) => {
+        setMessageLimit(cfg.unlimited ? null : (cfg.demo_message_limit ?? 5))
+      })
+      .catch(() => {
+        console.warn('Failed to fetch /api/config, using default limit of 5')
+        setMessageLimit(5)
+      })
+  }, [])
+
+  const atLimit = messageLimit !== null && userMessageCount >= messageLimit
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -240,7 +253,7 @@ export default function Home() {
           errorCount={allCorrections.length}
           onOpenErrors={() => setErrorsOpen(true)}
           messageCount={userMessageCount}
-          messageLimit={MESSAGES_LIMIT}
+          messageLimit={messageLimit}
         />
       </div>
 

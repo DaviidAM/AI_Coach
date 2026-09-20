@@ -13,6 +13,7 @@ from app.api.level import router as level_router
 from app.api.conversation import router as conversation_router
 from app.api.corrections import router as corrections_router
 from app.api.settings import router as settings_router
+from app.session import DEMO_MESSAGE_LIMIT, get_demo_limit
 from app.audio_janitor import run_janitor
 
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +43,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ----------------------------------------------------------------------
+# Runtime config endpoint — used by the frontend to discover the
+# deployment-time demo message limit without a rebuild.
+# ----------------------------------------------------------------------
+@app.get("/api/config", tags=["config"])
+def get_config():
+    return {
+        "demo_message_limit": get_demo_limit(),  # null when unlimited
+        "unlimited": get_demo_limit() is None,
+    }
 
 # Resolve static dir relative to this file, not the CWD.
 # chat.py saves coach/user audio to app/static/audio/ — mount that.

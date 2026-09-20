@@ -1,3 +1,5 @@
+import logging
+import os
 import time
 from typing import Optional
 from threading import Lock
@@ -5,8 +7,83 @@ from threading import Lock
 MAX_MESSAGES = 10
 IDLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
 
+_logger = logging.getLogger(__name__)
+
+# ----------------------------------------------------------------------
+# DEMO_MESSAGE_LIMIT — deployment-time env var for the user-facing demo
+# cap.  Parsed once at module import time so every request sees the same
+# value (consistent with how OMNIROUTE_DEFAULT_MODEL is read in llm.py).
+#
+#   "5"  (or any positive int string) → cap user messages at that number
+#   "-1"                              → unlimited (demo mode disabled)
+#   unset / empty / non-integer / negative other than -1 → 5 + warning
+# ----------------------------------------------------------------------
+def _parse_demo_message_limit() -> Optional[int]:
+    raw = os.getenv("DEMO_MESSAGE_LIMIT", "")
+    if not raw:
+        _logger.warning(
+            "DEMO_MESSAGE_LIMIT is not set; defaulting to 5. "
+            "Set DEMO_MESSAGE_LIMIT=-1 for unlimited (AACoach deployment)."
+        )
+        return 5
+    if raw == "-1":
+        return None  # unlimited
+    try:
+        val = int(raw)
+    except ValueError:
+        _logger.warning(
+            "DEMO_MESSAGE_LIMIT=%r is not an integer; defaulting to 5. "
+            "Valid values: a positive integer or -1 for unlimited.",
+            raw,
+        )
+        return 5
+    if val < 0 and val != -1:
+        _logger.warning(
+            "DEMO_MESSAGE_LIMIT=%d is negative (and not -1); defaulting to 5.", val
+        )
+        return 5
+    if val == 0:
+        _logger.warning("DEMO_MESSAGE_LIMIT=0 is not valid; defaulting to 5.")
+        return 5
+    return val
+
+
+DEMO_MESSAGE_LIMIT: Optional[int] = _parse_demo_message_limit()  # int or None (=unlimited)
+
+
+def get_demo_limit() -> Optional[int]:
+    """Re-read DEMO_MESSAGE_LIMIT from the current environment and return it.
+
+    Unlike the module-level ``DEMO_MESSAGE_LIMIT`` constant (which is captured
+    once at import time), this function re-evaluates the env var on every
+    call. Tests that need to assert behaviour for different env values should
+    use this function instead of the constant, and pair it with
+    ``monkeypatch.setenv()`` instead of editing ``sys.modules`` directly.
+
+    Returns ``None`` for unlimited, a positive ``int`` otherwise.
+    """
+    return _parse_demo_message_limit()
+
+
+def is_at_demo_limit(session_id: str) -> bool:
+    """Return True when the next user message would exceed DEMO_MESSAGE_LIMIT.
+
+    Always returns False when the limit is None (unlimited).
+
+    Reads the limit lazily via ``get_demo_limit()`` so that tests can change
+    the env var between requests without reimporting the module.
+    """
+    limit = get_demo_limit()
+    if limit is None:
+        return False
+    session = get_store().get_or_create(session_id)
+    with session.lock:
+        user_count = sum(1 for m in session.messages if m.get("role") == "user")
+    return user_count >= limit
+
 
 from app.llm import DEFAULT_SETTINGS
+
 
 class SessionData:
     def __init__(self):
@@ -79,5 +156,18 @@ class SessionStore:
         msgs = self.get_messages(session_id)
         return [{"role": m["role"], "content": m["text"]} for m in msgs]
 
+    def reset_all(self) -> None:
+        """Clear all sessions. Used by test fixtures to prevent cross-test bleed."""
+        with self._lock:
+            self._sessions.clear()
 
+
+# Module-level singleton. Exposed via a getter so that code that imports `store`
+# at module level (e.g. app.llm) always gets the current instance, even if
+# sys.modules is flushed and reimported (as test_message_limit.py does).
 store = SessionStore()
+
+
+def get_store() -> SessionStore:
+    """Return the current store singleton. Used by app.llm to avoid stale refs."""
+    return store
