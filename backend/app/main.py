@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.health import router as health_router
 from app.api.chat import router as chat_router
+from app.api.config import router as config_router
 from app.api.level import router as level_router
 from app.api.conversation import router as conversation_router
 from app.api.corrections import router as corrections_router
@@ -52,6 +53,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(health_router, prefix="/api", tags=["health"])
+app.include_router(config_router, prefix="/api", tags=["config"])
 app.include_router(chat_router, tags=["chat"])
 app.include_router(level_router, tags=["level"])
 app.include_router(conversation_router, tags=["conversation"])
