@@ -122,6 +122,38 @@ export async function getCorrections(
   return data.corrections || []
 }
 
+export async function getRecentCorrections(
+  userId: string,
+  limit = 20,
+  offset = 0
+): Promise<any[]> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    limit: String(limit),
+    offset: String(offset),
+  })
+  const res = await fetch(`${API_BASE}/api/corrections/recent?${params}`, {
+    headers: {'X-User-Device-Id': userId},
+  })
+  if (!res.ok) throw new Error('Failed to fetch recent corrections')
+  const data = await res.json()
+  return data.corrections || []
+}
+
+export async function markCorrectionReviewed(
+  correctionId: number,
+  userId: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/corrections/${correctionId}/review`,
+    {
+      method: 'POST',
+      headers: {'X-User-Device-Id': userId},
+    },
+  )
+  if (!res.ok) throw new Error('Failed to mark as reviewed')
+}
+
 export async function resetConversation(sessionId: string): Promise<void> {
   // Backend expects session_id as a query param, NOT in JSON body.
   // See backend/app/api/conversation.py — the FastAPI route declares
@@ -166,4 +198,9 @@ export function audioUrl(relativeUrl?: string): string | undefined {
 
 export function generateSessionId(): string {
   return crypto.randomUUID()
+}
+
+export async function switchLocale(locale: string): Promise<void> {
+  // Persist locale preference to a cookie (read by next-intl middleware)
+  document.cookie = `NEXT_LOCALE=${locale};path=/;max-age=31536000`
 }

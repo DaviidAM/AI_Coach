@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { LEVELS, Level, Theme } from '@/types'
-import { getLevel, setLevel } from '@/lib/api'
+import {useTranslations} from 'next-intl'
+import {useEffect, useRef, useState} from 'react'
+import {LEVELS, Level, Theme} from '@/types'
+import {getLevel, setLevel} from '@/lib/api'
+import {LocaleSwitcher} from './LocaleSwitcher'
 import styles from './Topbar.module.css'
-import { CoachIcon } from './icons/CoachIcon'
+import {CoachIcon} from './icons/CoachIcon'
 
 const THEME_KEY = 'ai-coach-theme'
 const SESSION_KEY = 'ai-coach-session-id'
@@ -34,12 +36,21 @@ export function Topbar({
   onOpenErrors,
   messageCount,
   messageLimit,
+  showChip = false,
+  chipRemaining = 0,
+  chipAmber = false,
+  chipRed = false,
 }: {
   errorCount?: number
   onOpenErrors?: () => void
   messageCount?: number
   messageLimit?: number
+  showChip?: boolean
+  chipRemaining?: number
+  chipAmber?: boolean
+  chipRed?: boolean
 }) {
+  const t = useTranslations()
   const [level, setLevelState] = useState<Level>('A2')
   const [theme, setThemeState] = useState<Theme>('dark')
   const [isMobile, setIsMobile] = useState(false)
@@ -108,38 +119,44 @@ export function Topbar({
     setStoredTheme(next)
   }
 
+  // Chip class
+  let chipClass = styles.demoCounter
+  if (showChip) {
+    if (chipRed) chipClass = `${styles.demoCounter} ${styles.demoCounterRed}`
+    else if (chipAmber) chipClass = `${styles.demoCounter} ${styles.demoCounterAmber}`
+  }
+
   return (
     <nav className={styles.topbar}>
       <div className={styles.left}>
         <span className={styles.logo} aria-hidden="true"><CoachIcon size={32} /></span>
-        <span className={styles.brand}>English AI Coach</span>
+        <span className={styles.brand}>{t('brand')}</span>
       </div>
 
       <div className={styles.center}>
-        <span className={styles.lang}>Demo Version</span>
-        {messageCount !== undefined && messageLimit !== undefined && (
-          <>
-            <span className={styles.demoCounter}>
-              {Math.min(messageCount, messageLimit)} of {messageLimit} demo messages used
-            </span>
-            {messageCount === messageLimit && (
-              <span className={styles.demoLimitFlag}>
-                <span aria-hidden="true">⚠️</span> limit reached
-              </span>
-            )}
-          </>
+        <span className={styles.lang}>{t('demoVersion')}</span>
+        {showChip && (
+          <span className={chipClass} aria-live="polite">
+            {chipRemaining === 1
+              ? t('demoLastMessage')
+              : chipRed
+              ? t('demoLimitReached')
+              : t('messageCount', {count: messageCount ?? 0, limit: messageLimit ?? 5})}
+          </span>
         )}
       </div>
 
       <div className={styles.right}>
+        <LocaleSwitcher />
+
         {isMobile ? (
           <>
-            <span className={styles.levelLabel}>English Level:</span>
+            <span className={styles.levelLabel}>{t('englishLevel')}:</span>
             <select
               className={styles.dropdown}
               value={level}
               onChange={(e) => handleLevelChange(e.target.value as Level)}
-              aria-label="Select CEFR level"
+              aria-label={t('selectCefr')}
             >
               {LEVELS.map((l) => (
                 <option key={l} value={l}>{l}</option>
@@ -155,7 +172,7 @@ export function Topbar({
               aria-haspopup="listbox"
               aria-expanded={levelMenuOpen}
             >
-              <span className={styles.levelLabel}>English Level:</span>
+              <span className={styles.levelLabel}>{t('englishLevel')}:</span>
               <span className={styles.levelValue}>{level}</span>
               <span
                 className={`${styles.levelCaret} ${levelMenuOpen ? styles.levelCaretOpen : ''}`}
@@ -168,7 +185,7 @@ export function Topbar({
               <ul
                 className={styles.levelMenu}
                 role="listbox"
-                aria-label="English level"
+                aria-label={t('englishLevel')}
               >
                 {LEVELS.map((l) => (
                   <li key={l} role="option" aria-selected={l === level}>
@@ -178,14 +195,7 @@ export function Topbar({
                       onClick={() => handleLevelSelect(l)}
                     >
                       <span className={styles.levelMenuLevel}>{l}</span>
-                      <span className={styles.levelMenuName}>
-                        {l === 'A1' ? 'Beginner' :
-                         l === 'A2' ? 'Elementary' :
-                         l === 'B1' ? 'Intermediate' :
-                         l === 'B2' ? 'Upper-Int.' :
-                         l === 'C1' ? 'Advanced' :
-                         l === 'C2' ? 'Proficient' : ''}
-                      </span>
+                      <span className={styles.levelMenuName}>{t(`level${l}`)}</span>
                     </button>
                   </li>
                 ))}
@@ -197,17 +207,17 @@ export function Topbar({
         <button
           className={styles.errorsButton}
           onClick={onOpenErrors}
-          aria-label="View all corrections"
-          title="View all corrections"
+          aria-label={t('allCorrections')}
+          title={t('allCorrections')}
         >
-          <span className={styles.errorsButtonLabel}>All Corrections</span>
+          <span className={styles.errorsButtonLabel}>{t('allCorrections')}</span>
           {errorCount > 0 && <span className={styles.errorsBadge}>{errorCount}</span>}
         </button>
 
         <button
           className={styles.themeToggle}
           onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          aria-label={theme === 'dark' ? t('switchToLight') : t('switchToDark')}
         >
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>
