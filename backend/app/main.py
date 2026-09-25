@@ -53,7 +53,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(health_router, prefix="/api", tags=["health"])
-app.include_router(config_router, prefix="/api", tags=["config"])
+app.include_router(config_router, tags=["config"])
 app.include_router(chat_router, tags=["chat"])
 app.include_router(level_router, tags=["level"])
 app.include_router(conversation_router, tags=["conversation"])

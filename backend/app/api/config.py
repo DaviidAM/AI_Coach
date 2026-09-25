@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(tags=["config"])
+router = APIRouter(prefix="/api/config", tags=["config"])
 
 DEMO_MESSAGE_LIMIT = int(os.getenv("DEMO_MESSAGE_LIMIT", "5"))
 
