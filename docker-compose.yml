@@ -61,6 +61,8 @@ services:
       # Persist runtime audio across container restarts.
       - ai-coach-audio:/app/backend/app/static/audio
       - ai-coach-audio-stt:/app/backend/app/static/audio/stt
+      # Persist corrections SQLite DB across restarts.
+      - ai-coach-data:/app/backend/data
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8091/api/health"]
       interval: 30s
@@ -112,3 +114,4 @@ networks:
 volumes:
   ai-coach-audio:
   ai-coach-audio-stt:
+  ai-coach-data:

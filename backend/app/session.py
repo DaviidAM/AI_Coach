@@ -79,5 +79,10 @@ class SessionStore:
         msgs = self.get_messages(session_id)
         return [{"role": m["role"], "content": m["text"]} for m in msgs]
 
+    def get_message_count(self, session_id: str) -> int:
+        """Return the number of messages (user + coach) for this session."""
+        msgs = self.get_messages(session_id)
+        return len(msgs)
+
 
 store = SessionStore()
