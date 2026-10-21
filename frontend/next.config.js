@@ -1,7 +1,9 @@
+const withNextIntl = require('next-intl/plugin')('./i18n/request.ts');
+
 /** @type {import('next').NextConfig} */
 const backendUrl = process.env.BACKEND_URL || "http://backend:8091";
 
-const nextConfig = {
+const nextConfig = withNextIntl({
   // Note: this project previously used `output: 'standalone'`. That setting
   // requires running `node .next/standalone/server.js` (not `npm start`) to
   // serve static chunks correctly on localhost. For VPS dev we run
@@ -24,5 +26,6 @@ const nextConfig = {
       { source: "/audio/:path*", destination: `${backendUrl}/static/audio/:path*` },
     ];
   },
-};
+});
+
 module.exports = nextConfig;

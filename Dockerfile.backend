@@ -30,7 +30,7 @@ COPY backend/ ./
 
 # Make sure the audio janitor has writable dirs (Render provides ephemeral disk,
 # so audio is regenerated each restart — janitor keeps the in-runtime dir clean).
-RUN mkdir -p /app/backend/app/static/audio /app/backend/app/static/audio/stt
+RUN mkdir -p /app/backend/app/static/audio /app/backend/app/static/audio/stt /app/backend/data
 
 EXPOSE 10000
 

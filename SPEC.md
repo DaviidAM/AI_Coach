@@ -337,3 +337,170 @@ Each PR must:
 2. **Render redeploy**: do we point the existing `ai-coach-pnf5` service at the new repo, or create a new service and swap DNS later?
 3. **Database**: persistence is in-process for v2. Is that OK for the demo, or do you want SQLite from day 1?
 4. **TTS voice**: any preference? Default `en-US-AriaNeural` (warm female).
+
+---
+
+## 8. Improvements from user review (2026-09-22)
+
+The four items below were prioritized by Daviid after reviewing the live
+demo. They were originally proposed in this conversation and are now part
+of the spec. Implementation belongs to the developer team — tracked as a
+single kanban task on a branch to be created from `main`.
+
+### 8.1 Visible message counter + warning before limit
+
+**Problem.** The `DEMO_MESSAGE_LIMIT` (configurable at deploy time) is
+invisible until the user writes their `N+1`-th message. The UI just
+silently locks the input and the user has to guess why.
+
+**Required.**
+
+- Always-visible counter: a small chip near the input that updates as
+  the user sends messages, e.g. `3 / 5 messages used`.
+- When `remaining ≤ 1`: the counter turns amber and shows the warning
+  text ("This is your last message" — must be translated).
+- When `remaining === 0`: same chip turns red and surfaces the existing
+  "demo limit reached" copy.
+- When `unlimited === true` (sentinel `DEMO_MESSAGE_LIMIT=-1`): counter
+  is hidden entirely. Do not render "∞" or "Unlimited" if Daviid prefers
+  a clean look (Daviid's preference: hide the chip).
+- Counter values come from a new `demo_message_limit` /
+  `messages_used` returned by `GET /api/config`.
+
+### 8.2 Full UI i18n (English + Spanish)
+
+**Problem.** Frontend currently has zero i18n setup (no `next-intl`, no
+`messages/{en,es}.json` directory). Several strings are hardcoded
+English in JSX (e.g. `aria-label="Message input"`,
+`aria-label="Send message"`, button titles, empty-state copy). The
+language switcher that Daviid asked about previously landed separately on
+`feat/archify-ai_coach-docs`; that switcher uses a tiny inline mapping and
+should be wired to the proper i18n layer as part of this task.
+
+**Required.**
+
+- Add `next-intl` (latest stable, MIT, no API key) and configure
+  `i18n.ts` with `locales = ['en', 'es']`, `defaultLocale = 'en'`.
+- Create `frontend/messages/en.json` and
+  `frontend/messages/es.json`. They must be kept in sync — keys present
+  in one must be present in the other, and values must be real
+  translations (no machine-translation-visible-to-the-user; Spanish
+  strings should read like natural Spanish, not literal English).
+- The locale switcher must use the i18n locale, persist to a cookie,
+  and reload on change.
+- Every user-visible string in `frontend/app/**` and
+  `frontend/components/**` must go through `useTranslations()`. No
+  hardcoded English in JSX. Strings to cover include but are not
+  limited to: header labels, topbar, button titles, empty-state copy,
+  error messages, audio control labels, banner text. `aria-label`s
+  must also use translation keys.
+- A unit test (frontend) or a small shell script must fail CI if the
+  two `messages/*.json` files diverge in keys.
+- The `archify-ai_coach-docs` branch is unrelated; i18n changes land
+  on the new branch for this task.
+
+### 8.3 Streaming responses (Server-Sent Events)
+
+**Problem.** Today `POST /api/chat` blocks until the full LLM response
+is generated (often 5-15 seconds for an OMNIROUTE reply). The user's
+last input is consumed and the UI is silent until the response appears.
+Perceived latency is awful.
+
+**Required.**
+
+- Add `POST /api/chat/stream` that returns `text/event-stream` (SSE)
+  and emits chunks of the `reply` field as they arrive from the LLM.
+- The LLM client in `backend/app/llm.py` already has partial streaming
+  support (SSE chunk parsing around line ~254). Reuse it instead of
+  writing a parallel implementation.
+- The existing non-streaming `POST /api/chat` stays as the fallback
+  when the client does not opt in to streaming (browser / curl).
+- Frontend (`frontend/app/page.tsx` and any chat component): when
+  the user submits a turn, request the streaming endpoint and append
+  chunks to the placeholder coach bubble as they arrive. Maintain the
+  existing JSON `{reply, corrections}` final-response semantics:
+  the last SSE chunk must carry the full corrections array so the
+  panel still renders after the bubble completes.
+- Show an in-bubble spinner / pulsing cursor while streaming so the
+  user knows the response is in flight.
+- When the stream ends, the bubble must transition from "streaming"
+  to "complete" and the corrections panel must populate.
+- Backwards compatible: `POST /api/chat` (non-streaming) must keep
+  working for clients that have not been updated yet.
+
+### 8.4 Spaced repetition queue from correction history
+
+**Problem.** The app shows corrections turn-by-turn but does not
+retain them for review. A student who makes the same mistake repeatedly
+never gets drilled on it. Corrections already carry `error_level` and
+`category`; everything needed for a minimal SRS-style review queue
+already exists.
+
+**Required.**
+
+- Persist corrections server-side. The existing `corrections.py`
+  already keeps an in-memory store keyed by `session_id`; extend it
+  to also write per-user per-correction records to disk (SQLite at
+  `./data/corrections.db` is fine — in-process persistence is
+  acceptable for this task). The storage format must support:
+  - list the user's most-recent N corrections (sorted by recency)
+  - list the user's top-K most-frequent correction *categories* and
+    *original_phrases* (for the dashboard / queue)
+  - mark corrections as "reviewed" with a timestamp
+- New endpoints:
+  - `GET /api/corrections/recent?user_id=…&limit=N`
+    → list of recent corrections (id, user_text snippet, original,
+      corrected, category, error_level, created_at).
+  - `GET /api/corrections/queue?user_id=…&limit=K`
+    → top most-frequent categories / original phrases for the queue.
+  - `POST /api/corrections/{correction_id}/review` → mark reviewed.
+- New frontend page or panel: a `/corrections` route OR a top-bar
+  button that opens a panel listing the queue. Each row shows
+  `original_phrase → corrected_phrase (category, error_level)` and a
+  "Mark as reviewed" button. Empty state must be handled cleanly.
+- Since v2 has no auth yet, identify users by `device_id` from
+  localStorage, accepted via header `X-User-Device-Id`. Document this
+  in each endpoint docstring.
+- Keep it minimal. No leaderboard, no analytics, no spaced-repetition
+  algorithm — just "this user has these errors; let them mark them
+  reviewed". SRS scheduling can come later.
+
+### Out of scope for this task
+- Real DB (PostgreSQL). SQLite file at `./data/corrections.db` is fine.
+- Audio streaming of the coach reply (TTS). Only the *text* stream
+  is in scope for 8.3.
+- Authentication / users. The `X-User-Device-Id` header convention
+  stands in for a real user.
+- Changes to the existing `feat/archify-ai_coach-docs` branch
+  (open documentation diagrams).
+
+### Acceptance criteria (must all pass before merge)
+
+1. **AC-1 Counter.** Visible chip in the UI; counts match backend
+   (`GET /api/config` returns `demo_message_limit`,
+   `messages_used`). Hidden when `unlimited`.
+2. **AC-2 i18n.** Zero hardcoded English strings in
+   `frontend/app/**` and `frontend/components/**` user-visible
+   surfaces. `messages/en.json` and `messages/es.json` have identical
+   key sets (test enforced). Toggling the locale flips every visible
+   string and persists the choice.
+3. **AC-3 Streaming.** `curl -N POST /api/chat/stream` returns
+   incremental SSE events for `reply`. The frontend bubble fills
+   word-by-word (verify visually in the browser). The non-streaming
+   `/api/chat` endpoint still works for clients that opt out.
+4. **AC-4 SRS.** Sent corrections accumulate server-side. After 3
+   turns with corrections, `/api/corrections/recent?limit=3`
+   returns those 3 records. The frontend `/corrections` (or panel)
+   lists them and "mark reviewed" persists across restarts.
+5. **AC-5 Tests.** `uv run pytest` (backend) and `npm test`
+   (frontend) both green.
+6. **AC-6 Build.** `docker compose up --build` runs cleanly;
+   `/api/health` returns 200.
+
+### Branch + commit rules
+- New branch: `feat/ux-improvements-demo-feedback` from `main`.
+- Commits: conventional prefix per area (`feat(chat): …`,
+  `feat(i18n): …`, `feat(corrections): …`).
+- Push to `origin feat/ux-improvements-demo-feedback`. NO PR (Daviid
+  merges manually).
+- NO push to `main`.

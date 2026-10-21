@@ -56,7 +56,7 @@ describe('getSettings', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8000/api/settings?session_id=test-session-123'
+      '/api/settings?session_id=test-session-123'
     )
     expect(result).toEqual(mockResponse)
   })
@@ -103,11 +103,11 @@ describe('setSettings', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8000/api/settings',
+      `/api/settings?session_id=${sessionId}`,
       expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, ...settings }),
+        body: JSON.stringify(settings),
       })
     )
   })
@@ -120,20 +120,22 @@ describe('setSettings', () => {
 
     await expect(
       setSettings('any-session', { provider: 'unknown', model: 'none' })
-    ).rejects.toThrow('Failed to set settings')
+    ).rejects.toThrow('Failed to save settings')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('spreads session_id alongside settings fields', async () => {
+  it('sends session_id as query param not body, settings fields only in body', async () => {
     const sessionId = 'sid-789'
     const settings: Settings = { provider: 'groq', model: 'llama-3.1-8b-instant' }
     fetchMock.mockResolvedValueOnce({ ok: true })
 
     await setSettings(sessionId, settings)
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body).toEqual({ session_id: sessionId, ...settings })
-    expect(body.session_id).toBe(sessionId)
+    // session_id goes in query string, body is just settings
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe(`/api/settings?session_id=${sessionId}`)
+    const body = JSON.parse(opts.body)
+    expect(body).toEqual(settings)
     expect(body.provider).toBe('groq')
     expect(body.model).toBe('llama-3.1-8b-instant')
   })

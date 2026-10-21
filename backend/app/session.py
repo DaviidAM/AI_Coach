@@ -161,6 +161,11 @@ class SessionStore:
         with self._lock:
             self._sessions.clear()
 
+    def get_message_count(self, session_id: str) -> int:
+        """Return the number of messages (user + coach) for this session."""
+        msgs = self.get_messages(session_id)
+        return len(msgs)
+
 
 # Module-level singleton. Exposed via a getter so that code that imports `store`
 # at module level (e.g. app.llm) always gets the current instance, even if

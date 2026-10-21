@@ -191,6 +191,69 @@ def call_minimax(messages: list[dict], retry: bool = False) -> str:
         return content
 
 
+def call_llm_streaming(messages: list[dict], settings: dict):
+    """
+    Call LLM in streaming mode. Yields text chunks as they arrive.
+    Reuses the OpenAI-compatible streaming API.
+    """
+    provider = settings.get("provider", "minimax")
+    model = settings.get("model", "")
+
+    if provider not in PROVIDERS:
+        raise LLMError(f"Unknown provider: {provider}")
+
+    config = PROVIDERS[provider]
+    env_key = config["env_key"]
+    base_url = config["base_url"]
+    api_key = os.getenv(env_key, "")
+
+    if provider != "omniroute" and not api_key:
+        raise LLMError(f"{env_key} not set")
+
+    if provider not in ("openai", "groq", "omniroute"):
+        # Only OpenAI-compatible providers support streaming text responses
+        raise LLMError(f"Streaming not supported for provider: {provider}")
+
+    payload = {
+        "model": model or "gpt-4o-mini",
+        "messages": messages,
+        "temperature": 0.7,
+        "stream": True,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key or 'no-key'}",
+        "Content-Type": "application/json",
+    }
+
+    def _do_request(model_to_use: str) -> httpx.Response:
+        payload["model"] = model_to_use
+        with httpx.Client(timeout=60.0) as client:
+            return client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+
+    resp = _do_request(model)
+    if resp.status_code != 200:
+        raise LLMError(f"{provider} streaming API returned {resp.status_code}: {resp.text[:300]}")
+
+    # SSE streaming: parse Content-Type: text/event-stream
+    # Each chunk: data: {"choices":[{"delta":{"content":"..."}}]}
+    import re
+    for line in resp.iter_lines():
+        if not line:
+            continue
+        if line.startswith("data: "):
+            data = line[6:]
+            if data == "[DONE]":
+                break
+            try:
+                obj = json.loads(data)
+                delta = obj.get("choices", [{}])[0].get("delta", {})
+                content = delta.get("content", "")
+                if content:
+                    yield content
+            except json.JSONDecodeError:
+                continue
+
+
 def call_llm(messages: list[dict], settings: dict) -> str:
     """
     Dispatch to the correct provider based on settings.provider.
