@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Coach — System Architecture",
+    "output": "ai-coach-architecture.html",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "full-system",
+        "label": "Full system",
+        "focus": ["browser", "nextjs", "fastapi", "session_store", "llm", "stt", "tts", "audio_dir", "omniroute", "media_api", "stt_dir"],
+        "note": "All components and how they connect end-to-end."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "media_api",
+      "type": "external",
+      "label": "MediaRecorder API",
+      "sublabel": "getUserMedia + MediaRecorder",
+      "pos": [40, 100],
+      "size": [120, 56]
+    },
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Browser",
+      "sublabel": "User's device",
+      "pos": [40, 360],
+      "size": [120, 60]
+    },
+    {
+      "id": "nextjs",
+      "type": "frontend",
+      "label": "Next.js",
+      "sublabel": "React 18, TypeScript",
+      "pos": [260, 360],
+      "size": [130, 60]
+    },
+    {
+      "id": "fastapi",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "Python 3.11, uvicorn",
+      "pos": [500, 360],
+      "size": [130, 60]
+    },
+    {
+      "id": "session_store",
+      "type": "database",
+      "label": "SessionStore",
+      "sublabel": "in-process, in-memory",
+      "pos": [500, 160],
+      "size": [130, 60],
+      "tag": "lost on restart"
+    },
+    {
+      "id": "llm",
+      "type": "backend",
+      "label": "LLM (get_llm_reply)",
+      "sublabel": "calls OmniRoute via httpx",
+      "pos": [760, 160],
+      "size": [130, 60]
+    },
+    {
+      "id": "stt",
+      "type": "backend",
+      "label": "faster-whisper STT",
+      "sublabel": "base model, CPU, int8",
+      "pos": [760, 360],
+      "size": [130, 60]
+    },
+    {
+      "id": "tts",
+      "type": "backend",
+      "label": "edge-tts TTS",
+      "sublabel": "en-US-AriaNeural",
+      "pos": [760, 520],
+      "size": [130, 60]
+    },
+    {
+      "id": "omniroute",
+      "type": "cloud",
+      "label": "OmniRoute",
+      "sublabel": "OpenAI-compatible LLM gateway",
+      "pos": [1010, 160],
+      "size": [130, 60]
+    },
+    {
+      "id": "audio_dir",
+      "type": "database",
+      "label": "/static/audio/",
+      "sublabel": "on-disk, persistent",
+      "pos": [1010, 360],
+      "size": [130, 60],
+      "tag": "survives restart"
+    },
+    {
+      "id": "stt_dir",
+      "type": "database",
+      "label": "/static/audio/stt/",
+      "sublabel": "on-disk, ephemeral",
+      "pos": [1010, 520],
+      "size": [130, 60],
+      "tag": "cleaned up by janitor"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Browser",
+      "wraps": ["browser", "media_api"]
+    },
+    {
+      "kind": "region",
+      "label": "FastAPI process",
+      "wraps": ["fastapi", "session_store", "llm", "stt", "tts"]
+    },
+    {
+      "kind": "region",
+      "label": "External services",
+      "wraps": ["omniroute"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-nextjs",
+      "from": "browser",
+      "to": "nextjs",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "media-browser",
+      "from": "media_api",
+      "to": "browser",
+      "label": "getUserMedia",
+      "variant": "security",
+      "labelDy": 30
+    },
+    {
+      "id": "nextjs-fastapi",
+      "from": "nextjs",
+      "to": "fastapi",
+      "label": "POST /api/chat",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fastapi-sessionstore",
+      "from": "fastapi",
+      "to": "session_store",
+      "label": "get_level / append_message"
+    },
+    {
+      "id": "fastapi-llm",
+      "from": "fastapi",
+      "to": "llm",
+      "label": "get_llm_reply()"
+    },
+    {
+      "id": "fastapi-stt",
+      "from": "fastapi",
+      "to": "stt",
+      "label": "transcribe()"
+    },
+    {
+      "id": "fastapi-tts",
+      "from": "fastapi",
+      "to": "tts",
+      "label": "synthesize()"
+    },
+    {
+      "id": "llm-omniroute",
+      "from": "llm",
+      "to": "omniroute",
+      "label": "OMNIROUTE_BASE_URL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fastapi-audiodir",
+      "from": "fastapi",
+      "to": "audio_dir",
+      "label": "write coach .mp3",
+      "labelDy": 30,
+      "via": [[660, 390], [660, 440], [960, 440], [960, 390]]
+    },
+    {
+      "id": "fastapi-sttdir",
+      "from": "fastapi",
+      "to": "stt_dir",
+      "label": "write user .webm",
+      "via": [[660, 390], [660, 500], [960, 500], [960, 550]]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Frontend",
+      "items": [
+        "Next.js 14 with TypeScript and CSS Modules",
+        "MediaRecorder captures mic audio in the browser",
+        "Audio playback via <audio> tags pointing to /static/audio/"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Backend",
+      "items": [
+        "FastAPI serves /api/chat and static files from app/static/audio/",
+        "faster-whisper (base, CPU) for STT; edge-tts (en-US-AriaNeural) for TTS",
+        "SessionStore is in-process — data is lost when the process restarts"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "LLM routing",
+      "items": [
+        "LLM calls go through OmniRoute at OMNIROUTE_BASE_URL (http://host.docker.internal:20128/v1)",
+        "OmniRoute is an OpenAI-compatible gateway running as a systemd service on the host",
+        "Providers: omniroute (default), minimax, openai, anthropic, groq"
+      ]
+    }
+  ]
+}
