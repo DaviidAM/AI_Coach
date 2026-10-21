@@ -1,4 +1,5 @@
 import os
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -25,11 +26,23 @@ def get_config(session_id: str) -> ConfigResponse:
     """
     from app.session import store
 
+    # Read the env var per request rather than reusing the module-level
+    # constant captured at import time, so tests that monkeypatch the
+    # environment observe the change and deploys can adjust the limit without
+    # a restart.
+    raw = os.getenv("DEMO_MESSAGE_LIMIT", "5")
+    try:
+        limit = int(raw)
+    except ValueError:
+        limit = 5
+    if limit < -1:
+        limit = 5
+
     messages_used = store.get_message_count(session_id)
-    unlimited = DEMO_MESSAGE_LIMIT < 0
+    unlimited = limit < 0
 
     return ConfigResponse(
-        demo_message_limit=DEMO_MESSAGE_LIMIT,
+        demo_message_limit=limit,
         messages_used=messages_used,
         unlimited=unlimited,
     )

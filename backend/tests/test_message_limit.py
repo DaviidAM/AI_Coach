@@ -76,7 +76,12 @@ class TestDemoMessageLimitParsing:
 # Test: GET /api/config endpoint.
 # ---------------------------------------------------------------------------
 class TestConfigEndpoint:
-    """GET /api/config surfaces the parsed limit."""
+    """GET /api/config surfaces the parsed limit.
+
+    The endpoint is served by app/api/config.py (included as config_router in
+    app/main.py). It requires a session_id and additionally reports
+    messages_used, which the frontend demo counter consumes.
+    """
 
     def test_config_returns_5_and_false_when_env_unset(self, monkeypatch):
         """AC-5: demo_message_limit=5, unlimited=false when env var is unset."""
@@ -84,19 +89,31 @@ class TestConfigEndpoint:
         from app.main import app as main_app
 
         client = TestClient(main_app)
-        resp = client.get("/api/config")
+        resp = client.get("/api/config", params={"session_id": "test-session"})
         assert resp.status_code == 200
-        assert resp.json() == {"demo_message_limit": 5, "unlimited": False}
+        assert resp.json() == {
+            "demo_message_limit": 5,
+            "messages_used": 0,
+            "unlimited": False,
+        }
 
-    def test_config_returns_null_and_true_when_env_is_minus_one(self, monkeypatch):
-        """AC-5: demo_message_limit=null, unlimited=true when env is -1."""
+    def test_config_returns_minus_one_and_true_when_env_is_minus_one(self, monkeypatch):
+        """AC-5: demo_message_limit=-1, unlimited=true when env is -1.
+
+        The sentinel -1 is passed through verbatim; callers decide how to
+        render it, and `unlimited` is the boolean the UI keys off.
+        """
         monkeypatch.setenv("DEMO_MESSAGE_LIMIT", "-1")
         from app.main import app as main_app
 
         client = TestClient(main_app)
-        resp = client.get("/api/config")
+        resp = client.get("/api/config", params={"session_id": "test-session"})
         assert resp.status_code == 200
-        assert resp.json() == {"demo_message_limit": None, "unlimited": True}
+        assert resp.json() == {
+            "demo_message_limit": -1,
+            "messages_used": 0,
+            "unlimited": True,
+        }
 
     def test_config_returns_custom_int(self, monkeypatch):
         """AC-3: demo_message_limit=20, unlimited=false for custom positive int."""
@@ -104,9 +121,13 @@ class TestConfigEndpoint:
         from app.main import app as main_app
 
         client = TestClient(main_app)
-        resp = client.get("/api/config")
+        resp = client.get("/api/config", params={"session_id": "test-session"})
         assert resp.status_code == 200
-        assert resp.json() == {"demo_message_limit": 20, "unlimited": False}
+        assert resp.json() == {
+            "demo_message_limit": 20,
+            "messages_used": 0,
+            "unlimited": False,
+        }
 
 
 # ---------------------------------------------------------------------------
