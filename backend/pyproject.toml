@@ -12,6 +12,8 @@ dependencies = [
     "faster-whisper",
     "edge-tts",
     "python-multipart",
+    "pypdf",
+    "python-docx",
     "pytest",
     "pytest-asyncio",
 ]

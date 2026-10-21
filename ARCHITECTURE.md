@@ -69,3 +69,155 @@ Session data is held in an in-memory dict keyed by `session_id` (UUID, stored in
 ```
 
 `POST /api/conversation/reset` clears `messages` and `corrections` for the session, keeping the `level`.
+
+## Interview Coach
+
+The Interview Coach is a second frontend route (`/interview`) backed by a
+separate FastAPI router (`/api/interview`). It deliberately does not share
+session state with the English coach.
+
+### Backend layout
+
+```
+backend/app/interview/
+├── models.py            # Pydantic request/response models
+├── store.py             # InterviewStore + per-session state
+├── offer.py             # txt/md/pdf/docx extraction + heuristic brief
+├── llm.py               # brief, turn and report orchestration
+├── prompts.py           # shared rules, JSON contracts, prompt builders
+├── audio.py             # interview STT/TTS helpers
+└── skills/
+    ├── base.py          # InterviewSkill dataclass + system prompt
+    ├── introduction.py  # intro stage rubric and question plan
+    ├── technical.py     # technical rubric + role-track guidance
+    └── final.py         # hiring-manager rubric
+```
+
+`skills/base.py` renders one system prompt per turn from the skill's persona,
+objective, question plan, evaluation dimensions, common mistakes, role-track
+guidance and score guide. The shared rules and JSON contract live in
+`prompts.py`.
+
+### Setup flow
+
+1. The browser shows a mandatory setup modal on `/interview`.
+2. The user pastes an offer or uploads `.txt`, `.md`, `.pdf` or `.docx`
+   (max 5 MB) and selects `intro`, `technical` or `final`.
+3. The backend extracts text, cleans it and asks the LLM for a structured
+   brief: role title, company, seniority, track, key skills, digest and an
+   opening message.
+4. If the LLM is unavailable, `offer.heuristic_brief()` extracts the same
+   fields with regex/keyword rules and the stage's `fallback_opening` is used.
+5. The opening message is stored as the first interviewer turn and TTS is
+   attempted; TTS failure is non-fatal.
+6. The role brief and offer are stored in the interview session, not in the
+   English session.
+
+### One interview turn
+
+```
+Candidate text/audio
+        │
+        ▼
+POST /api/interview/chat (multipart)
+        │
+        ├── audio → faster-whisper STT ──► candidate text (+ saved recording URL)
+        │
+        ├── text  → edge-tts TTS ────────► candidate audio URL (best-effort)
+        │
+        ▼
+InterviewStore appends candidate message
+        │
+        ▼
+LLM (skill system prompt + full interview history)
+        │
+        ▼
+{ interviewer_reply, answer_score, strengths, feedback[] }
+        │
+        ├── normalize categories/severities and field aliases
+        ├── clamp score to 1–5
+        ├── store feedback + score + strengths
+        ├── edge-tts TTS for interviewer_reply (best-effort)
+        ▼
+InterviewStore appends interviewer message
+        │
+        ▼
+Frontend: interviewer bubble + live feedback panel
+```
+
+The interviewer reply is the next question in character. Coaching feedback is
+returned alongside it and is never spoken by the interviewer.
+
+### Session state
+
+`InterviewStore` is keyed by `session_id` from
+`localStorage["ai-interview-session-id"]` and holds:
+
+```python
+{
+    "interview_type": "technical",
+    "offer_text": "...",
+    "brief": {
+        "role_title": "Senior Backend Engineer",
+        "company": "Acme",
+        "seniority": "senior",
+        "role_track": "software_engineering",
+        "key_skills": ["Python", "AWS"],
+        "offer_digest": "...",
+    },
+    "opening_message": "...",
+    "messages": [
+        {"role": "interviewer", "text": "...", "audio_url": "..."},
+        {"role": "candidate", "text": "...", "audio_url": "..."},
+    ],
+    "feedback": [
+        {
+            "id": "...",
+            "turn": 1,
+            "question": "...",
+            "category": "impact",
+            "severity": "major",
+            "evidence": "...",
+            "issue": "...",
+            "why_it_matters": "...",
+            "better_answer": "...",
+            "timestamp": "...",
+        },
+    ],
+    "strengths": ["..."],
+    "turn_scores": [{"turn": 1, "score": 3, "strengths": ["..."]}],
+    "report": {...},
+}
+```
+
+Conversation messages are capped at 64 by `MAX_INTERVIEW_MESSAGES`; candidate
+answers are capped by `INTERVIEW_MESSAGE_LIMIT` (default 20, `-1` unlimited).
+Feedback history is returned newest-first for the history modal; the session
+restore endpoint returns it chronologically.
+
+### End-of-interview report
+
+`POST /api/interview/report` sends the transcript, the recorded feedback and
+the per-turn scores to the LLM. The response contains an overall score (1–5),
+a practice readiness label (`not_ready`, `getting_there`, `interview_ready`),
+a summary, strengths, gaps and next steps. If the LLM is unavailable, a
+rule-based report is built from the same session data. Readiness is a practice
+signal, not a hiring decision.
+
+### Frontend
+
+```
+app/interview/page.tsx                 # state, send/record, end/reset
+components/InterviewSetupModal.tsx     # mandatory offer + stage modal
+components/InterviewTopbar.tsx         # role, stage, feedback/report actions
+components/InterviewFeedbackPanel.tsx  # live per-answer coaching
+components/InterviewFeedbackModal.tsx  # full feedback history by turn
+components/InterviewReportModal.tsx    # final practice report
+lib/interview-api.ts                   # fetch wrappers
+types/interview.ts                     # shared TypeScript types
+```
+
+Audio and text input reuse the same MediaRecorder and `AudioPlayer`
+components as the English coach. The chat layout reuses
+`app/chat.module.css`, while interview-specific styling lives in dedicated CSS
+modules.

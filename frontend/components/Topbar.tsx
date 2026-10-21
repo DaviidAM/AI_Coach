@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { LEVELS, Level, Theme } from '@/types'
 import { getLevel, setLevel } from '@/lib/api'
 import styles from './Topbar.module.css'
@@ -132,6 +133,10 @@ export function Topbar({
       </div>
 
       <div className={styles.right}>
+        <Link href="/interview" className={styles.interviewLink}>
+          Interview Coach
+        </Link>
+
         {isMobile ? (
           <>
             <span className={styles.levelLabel}>English Level:</span>

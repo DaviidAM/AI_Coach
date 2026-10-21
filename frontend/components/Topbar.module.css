@@ -342,3 +342,24 @@
   font-weight: 500;
   opacity: 0.85;
 }
+
+.interviewLink {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+  padding: 0.35rem 0.55rem;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 40%, transparent);
+}
+
+.interviewLink:hover {
+  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
+}
+
+@media (max-width: 640px) {
+  .interviewLink {
+    font-size: 0.625rem;
+    padding: 0.3rem 0.45rem;
+  }
+}

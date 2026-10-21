@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { Topbar } from '@/components/Topbar'
 
 // Mock the API module
@@ -30,23 +30,33 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+beforeAll(() => {
+  Object.defineProperty(global, 'crypto', {
+    value: { randomUUID: () => 'test-session' },
+    configurable: true,
+  })
+})
+
 describe('Topbar', () => {
-  it('renders logo and brand text', () => {
+  it('renders the brand and demo label', () => {
     render(<Topbar />)
-    expect(screen.getByText('AI Coach')).toBeInTheDocument()
-    expect(screen.getByText('🎯')).toBeInTheDocument()
+    expect(screen.getByText('English AI Coach')).toBeInTheDocument()
+    expect(screen.getByText('Demo Version')).toBeInTheDocument()
   })
 
-  it('renders language label', () => {
+  it('links to the interview coach', () => {
     render(<Topbar />)
-    expect(screen.getByText('English · voice & text')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Interview Coach' })
+    expect(link).toHaveAttribute('href', '/interview')
   })
 
-  it('renders all level chips', () => {
+  it('opens the CEFR level menu and lists every level', () => {
     render(<Topbar />)
-    const chips = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
-    chips.forEach((level) => {
-      expect(screen.getByRole('button', { name: new RegExp(level) })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /English Level: A2/i }))
+    const listbox = screen.getByRole('listbox', { name: 'English level' })
+    expect(listbox).toBeInTheDocument()
+    ;['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].forEach((level) => {
+      expect(screen.getByRole('option', { name: new RegExp(level) })).toBeInTheDocument()
     })
   })
 
@@ -54,5 +64,10 @@ describe('Topbar', () => {
     render(<Topbar />)
     const toggle = screen.getByRole('button', { name: /switch to/i })
     expect(toggle).toBeInTheDocument()
+  })
+
+  it('shows the demo message counter when provided', () => {
+    render(<Topbar messageCount={2} messageLimit={5} />)
+    expect(screen.getByText('2 of 5 demo messages used')).toBeInTheDocument()
   })
 })

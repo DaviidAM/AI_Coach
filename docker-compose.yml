@@ -53,6 +53,9 @@ services:
       #   any other positive int → custom cap
       # Changing this requires a redeploy: docker compose up -d --build
       - DEMO_MESSAGE_LIMIT=${DEMO_MESSAGE_LIMIT:-5}
+      # Interview coach: maximum candidate answers per interview session.
+      # Default 20; set -1 for unlimited.
+      - INTERVIEW_MESSAGE_LIMIT=${INTERVIEW_MESSAGE_LIMIT:-20}
       # OmniRoute gateway — see README "Configuration > Backend" for the
       # full reference. Defaults below match the documented behaviour when
       # no env override is set.
