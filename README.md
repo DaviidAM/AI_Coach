@@ -65,7 +65,12 @@ Visit http://localhost:3000.
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full system design and the following diagrams:
+
+- [Component architecture](docs/diagrams/ai-coach-architecture.html)
+- [Chat sequence](docs/diagrams/ai-coach-chat-sequence.html)
+- [Audio dataflow](docs/diagrams/ai-coach-audio-dataflow.html)
+- [Dev deploy topology](docs/diagrams/ai-coach-dev-deploy.html)
 
 ## Configuration
 
