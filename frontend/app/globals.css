@@ -1,54 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 /* Global styles for AI Coach */
 
 :root {
-  /* Dark theme (default) */
-  --bg-primary: #0A0A0F;
-  --bg-secondary: #1A1A2E;
-  --bg-tertiary: #16213E;
-  --bg-message-user: #1F2937;
-  --bg-message-coach: #312E81;
-  --bg-input: #1F2937;
-  --text-primary: #F9FAFB;
-  --text-secondary: #D1D5DB;
-  --text-muted: #9CA3AF;
-  --text-on-accent: #FFFFFF;
-  --accent-indigo: #6366F1;
-  --accent-cyan: #22D3EE;
-  --accent-indigo-hover: #818CF8;
-  --accent-danger: #EF4444;
-  --border-color: #374151;
-  --border-color-light: #4B5563;
-  --chip-bg: #1F2937;
-  --chip-active-bg: #6366F1;
-  --chip-active-text: #FFFFFF;
+  /* Forest theme (default) */
+  --bg-primary: #0d1510;
+  --bg-secondary: #142018;
+  --bg-tertiary: #19271e;
+  --bg-message-user: #207a4e;
+  --bg-message-coach: #24352b;
+  --bg-input: #1b2b21;
+  --text-primary: #ffffff;
+  --text-secondary: #d7e6dc;
+  --text-muted: #9db4a5;
+  --text-on-accent: #0f1712;
+  --accent-indigo: #39e585;
+  --accent-cyan: #c2dc6d;
+  --accent-indigo-hover: #5cf0a0;
+  --accent-danger: #f87171;
+  --border-color: rgba(74, 107, 85, 0.35);
+  --border-color-light: rgba(89, 134, 107, 0.55);
+  --chip-bg: #1b2b21;
+  --chip-active-bg: #39e585;
+  --chip-active-text: #0f1712;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 20px 60px -10px rgb(0 0 0 / 0.75);
+
+  /* Chat-specific surfaces for the forest design */
+  --chat-page-bg: #0d1510;
+  --chat-card-bg: #142018;
+  --chat-card-border: rgba(86, 128, 100, 0.3);
+  --chat-card-shadow: 0 20px 60px -10px rgb(0 0 0 / 0.75),
+    0 0 50px rgb(46 203 119 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.12);
+  --chat-banner-bg: #19271e;
+  --chat-banner-border: rgba(86, 128, 100, 0.28);
+  --chat-icon-bg: #203428;
+  --chat-icon-border: rgba(194, 220, 109, 0.25);
+  --chat-input-bg: #1b2b21;
+  --chat-input-border: rgba(86, 128, 100, 0.35);
+  --chat-input-focus: #39e585;
+  --chat-pill-bg: #1f3126;
+  --chat-pill-hover: #253b2e;
+  --chat-pill-border: rgba(86, 128, 100, 0.35);
+  --chat-coach-bubble: #24352b;
+  --chat-coach-border: rgba(95, 142, 114, 0.35);
+  --chat-user-from: #175c3a;
+  --chat-user-to: #207a4e;
+  --chat-user-border: rgba(57, 229, 133, 0.3);
+  --chat-user-shadow: 0 8px 24px -4px rgb(32 122 78 / 0.45);
+  --chat-accent: #39e585;
+  --chat-accent-soft: #c2dc6d;
+  --chat-muted: #9db4a5;
+  --chat-glow-amber: rgb(138 92 42 / 0.22);
+  --chat-glow-emerald: rgb(35 92 57 / 0.28);
+  --chat-glow-mint: rgb(57 229 133 / 0.12);
 }
 
 [data-theme="light"] {
-  --bg-primary: #F9FAFB;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F3F4F6;
-  --bg-message-user: #E0E7FF;
-  --bg-message-coach: #FFFFFF;
-  --bg-input: #FFFFFF;
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-muted: #6B7280;
-  --text-on-accent: #FFFFFF;
-  --accent-indigo: #6366F1;
-  --accent-cyan: #0891B2;
-  --accent-indigo-hover: #4F46E5;
-  --accent-danger: #DC2626;
-  --border-color: #E5E7EB;
-  --border-color-light: #D1D5DB;
-  --chip-bg: #E5E7EB;
-  --chip-active-bg: #6366F1;
-  --chip-active-text: #FFFFFF;
+  --bg-primary: #f4faf5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eaf4ec;
+  --bg-message-user: #1f7a4e;
+  --bg-message-coach: #ffffff;
+  --bg-input: #f2f8f4;
+  --text-primary: #101b14;
+  --text-secondary: #2f4a3a;
+  --text-muted: #5f7a69;
+  --text-on-accent: #ffffff;
+  --accent-indigo: #147a4a;
+  --accent-cyan: #5c7a1f;
+  --accent-indigo-hover: #0c663a;
+  --accent-danger: #c24141;
+  --border-color: rgba(74, 107, 85, 0.22);
+  --border-color-light: rgba(74, 107, 85, 0.35);
+  --chip-bg: #eaf4ec;
+  --chip-active-bg: #147a4a;
+  --chip-active-text: #ffffff;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.15);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 20px 60px -10px rgb(0 0 0 / 0.15);
+
+  --chat-page-bg: #f4faf5;
+  --chat-card-bg: #ffffff;
+  --chat-card-border: rgba(74, 107, 85, 0.25);
+  --chat-card-shadow: 0 20px 60px -10px rgb(25 65 40 / 0.16),
+    0 0 50px rgb(46 203 119 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.8);
+  --chat-banner-bg: #f0f8f2;
+  --chat-banner-border: rgba(74, 107, 85, 0.22);
+  --chat-icon-bg: #e4f3e8;
+  --chat-icon-border: rgba(92, 122, 31, 0.25);
+  --chat-input-bg: #f2f8f4;
+  --chat-input-border: rgba(74, 107, 85, 0.24);
+  --chat-input-focus: #147a4a;
+  --chat-pill-bg: #eaf4ec;
+  --chat-pill-hover: #e0f0e4;
+  --chat-pill-border: rgba(74, 107, 85, 0.24);
+  --chat-coach-bubble: #f3faf5;
+  --chat-coach-border: rgba(74, 107, 85, 0.18);
+  --chat-user-from: #16724a;
+  --chat-user-to: #1e8a5a;
+  --chat-user-border: rgba(20, 122, 74, 0.2);
+  --chat-user-shadow: 0 8px 24px -4px rgb(20 122 74 / 0.25);
+  --chat-accent: #147a4a;
+  --chat-accent-soft: #5c7a1f;
+  --chat-muted: #5f7a69;
+  --chat-glow-amber: rgb(194 139 74 / 0.12);
+  --chat-glow-emerald: rgb(35 92 57 / 0.1);
+  --chat-glow-mint: rgb(57 229 133 / 0.08);
 }
 
 * {
@@ -62,8 +121,10 @@ body {
   height: 100%;
   max-width: 100vw;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Plus Jakarta Sans has tight default word gaps at UI sizes; keep prose readable. */
+  word-spacing: 0.12em;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -87,6 +148,7 @@ a {
 
 button {
   font-family: inherit;
+  word-spacing: inherit;
   cursor: pointer;
   border: none;
   background: none;
@@ -105,6 +167,12 @@ textarea {
   outline: none;
   background: none;
   color: inherit;
+}
+
+input,
+textarea,
+select {
+  word-spacing: inherit;
 }
 
 /* Scrollbar */

@@ -6,12 +6,15 @@ import styles from './AudioPlayer.module.css'
 interface AudioPlayerProps {
   src: string
   /**
-   * Who is speaking? Used for the "You" / "Coach" label.
-   * Whichever role owns this audio is also what styles the player
-   * (the parent <span> carries messageUser / messageCoach classes,
-   *  and CSS Module :global rules style the inner buttons).
+   * Who is speaking? Used for the default "You" / "Coach" label and the
+   * data-variant hook on the player.
    */
   variant?: 'user' | 'coach'
+  /**
+   * Optional display label for coaches that are not called "Coach"
+   * (for example "Interviewer").
+   */
+  label?: string
 }
 
 /**
@@ -22,7 +25,11 @@ interface AudioPlayerProps {
  * Designed to live INSIDE a bubble (the parent .bubble carries the visual
  * styling and color); this component focuses on behavior.
  */
-export function AudioPlayer({ src, variant = 'coach' }: AudioPlayerProps) {
+export function AudioPlayer({
+  src,
+  variant = 'coach',
+  label: labelOverride,
+}: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -40,8 +47,9 @@ export function AudioPlayer({ src, variant = 'coach' }: AudioPlayerProps) {
   }, [src])
 
   useEffect(() => {
+    const audio = audioRef.current
     return () => {
-      audioRef.current?.pause()
+      audio?.pause()
     }
   }, [])
 
@@ -73,7 +81,7 @@ export function AudioPlayer({ src, variant = 'coach' }: AudioPlayerProps) {
   // between renders). 18 bars is enough density for visual rhythm
   // without being noisy.
   const bars = generateWaveform(src, 18)
-  const label = variant === 'user' ? 'You' : 'Coach'
+  const label = labelOverride ?? (variant === 'user' ? 'You' : 'Coach')
 
   return (
     <div className={styles.player} data-variant={variant}>

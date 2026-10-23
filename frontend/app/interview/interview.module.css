@@ -1,39 +1,20 @@
+/* Interview-coach-specific styles. Shared chat layout, bubbles, audio,
+ * composer and speaker labels live in components/chat/chat.module.css. */
+
 .setupCta {
   margin-top: 0.75rem;
-  padding: 0.6rem 1rem;
-  border-radius: 10px;
-  background: var(--accent-indigo);
-  color: var(--text-on-accent);
+  padding: 0.65rem 1.1rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d4e886, #9dbd44);
+  box-shadow: 0 0 25px rgb(194 220 109 / 0.22);
+  color: #122216;
+  font-family: inherit;
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 800;
+  transition: filter 0.15s ease, transform 0.1s ease;
 }
 
 .setupCta:hover {
-  background: var(--accent-indigo-hover);
-}
-
-.speaker {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0 0 0.15rem 0.35rem;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dot {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  padding: 0 0.35rem;
-}
-
-@media (max-width: 640px) {
-  .speaker {
-    font-size: 0.5625rem;
-    margin-left: 0.2rem;
-  }
+  filter: brightness(1.05);
+  transform: translateY(-1px);
 }

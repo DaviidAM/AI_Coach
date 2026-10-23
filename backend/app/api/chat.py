@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+import logging
 import uuid
 from pathlib import Path
 
@@ -12,6 +14,29 @@ from app.tts import synthesize
 from app.api.corrections import store_corrections
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+_logger = logging.getLogger(__name__)
+
+
+async def _safe_synthesize(text: str, output_path: Path, label: str) -> str | None:
+    """Generate audio without ever breaking the text conversation.
+
+    Both the user and coach messages are supposed to carry audio. If every
+    TTS engine fails, the chat still returns 200 with the text and a ``None``
+    audio URL, which is preferable to losing the whole turn behind a 500.
+    """
+    if not text or not text.strip():
+        return None
+    try:
+        await synthesize(text, output_path)
+    except Exception as exc:  # noqa: BLE001 - audio is best-effort per turn
+        _logger.warning("%s TTS failed: %s", label, exc)
+        try:
+            output_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return None
+    return f"/static/audio/{output_path.name}"
 
 # Files written here are served at /static/audio/...
 # Path is anchored to this file's directory (app/api/), so it matches
@@ -67,6 +92,12 @@ async def chat(
     if not has_text and not has_audio:
         raise HTTPException(status_code=400, detail="Either text or audio must be provided")
 
+    # Enforce the demo limit before doing any STT/TTS work. The limit is a
+    # user-facing cap, not an LLM context limit, so an over-limit turn must
+    # fail fast without writing orphan audio files.
+    if is_at_demo_limit(session_id):
+        raise HTTPException(status_code=429, detail="Demo message limit reached")
+
     user_text: str | None = None
     user_audio_url: str | None = None
 
@@ -90,8 +121,16 @@ async def chat(
             f.write(audio_bytes)
         user_audio_url = f"/static/audio/stt/stt_{user_uuid}.{ext}"
 
-        # Transcribe via STT
-        user_text = transcribe(audio_bytes)
+        # Transcribe via STT. Run the CPU-bound model in a worker thread so
+        # the event loop can keep serving the frontend.
+        try:
+            user_text = await run_in_threadpool(transcribe, audio_bytes)
+        except Exception as exc:  # noqa: BLE001 - translate to a safe API error
+            _logger.warning("STT failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="Could not transcribe the audio. Please try again or type your message.",
+            ) from exc
 
     else:
         user_text = text
@@ -100,16 +139,13 @@ async def chat(
         # has uniform context. Saves to /static/audio/<uuid>.mp3.
         user_uuid = uuid.uuid4()
         user_audio_path = get_audio_dir() / f"{user_uuid}.mp3"
-        await synthesize(user_text or "", user_audio_path)
-        user_audio_url = f"/static/audio/{user_uuid}.mp3"
+        user_audio_url = await _safe_synthesize(user_text or "", user_audio_path, "user")
 
     # Get user level
     level = store.get_level(session_id)
 
-    # Append user message to session — enforce demo limit BEFORE appending
+    # Append user message to session
     if user_text:
-        if is_at_demo_limit(session_id):
-            raise HTTPException(status_code=429, detail="Demo message limit reached")
         store.append_message(session_id, "user", user_text)
 
     # Get history for LLM
@@ -136,14 +172,12 @@ async def chat(
     # Append coach message to session
     store.append_message(session_id, "assistant", coach_text)
 
-    # Synthesize TTS for coach reply (always, even for text-only input)
+    # Synthesize TTS for coach reply (always, even for text-only input).
+    # Audio is best-effort here so a blocked TTS provider can never hide the
+    # coach's text answer behind an HTTP 500.
     coach_uuid = uuid.uuid4()
     coach_audio_path = get_audio_dir() / f"{coach_uuid}.mp3"
-    try:
-        await synthesize(coach_text, coach_audio_path)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"TTS synthesis failed: {e}") from None
-    coach_audio_url = f"/static/audio/{coach_uuid}.mp3"
+    coach_audio_url = await _safe_synthesize(coach_text, coach_audio_path, "coach")
 
     response_data = {
         "session_id": session_id,

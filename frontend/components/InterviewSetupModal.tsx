@@ -142,7 +142,7 @@ export function InterviewSetupModal({
             </button>
           ) : (
             <Link href="/" className={styles.backLink}>
-              ← English coach
+              ← AI Coach Home
             </Link>
           )}
         </div>

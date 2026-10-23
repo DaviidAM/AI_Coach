@@ -18,7 +18,7 @@ from pathlib import Path
 backend_root = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_root))
 
-from app.llm import call_llm, LLMError
+from app.llm import call_llm, get_llm_reply, LLMError
 
 
 def make_mock_response(body: dict, status_code: int = 200) -> httpx.Response:
@@ -160,3 +160,19 @@ class TestOmniRouteIntegration:
             )
 
         assert result == "SSE reply"
+
+    def test_get_llm_reply_falls_back_when_omniroute_is_unreachable(self):
+        """A connection error must use the offline coach, not raise a 500."""
+        with patch(
+            "app.llm.call_llm",
+            side_effect=httpx.ConnectError("All connection attempts failed"),
+        ):
+            result, fallback_reason = get_llm_reply(
+                "A2",
+                [{"role": "user", "content": "I goed to the market yesterday"}],
+                settings={"provider": "omniroute", "model": "demo-combo"},
+            )
+
+        assert "All connection attempts failed" in (fallback_reason or "")
+        assert result["reply"]
+        assert result["corrections"]

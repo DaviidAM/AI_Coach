@@ -1,18 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { InterviewType } from '@/types/interview'
-import type { Theme } from '@/types'
-import { CoachIcon } from './icons/CoachIcon'
+import { useTheme } from '@/hooks/useTheme'
+import { CoachHeader } from './chat/CoachHeader'
+import headerStyles from './chat/HeaderControls.module.css'
+import { BriefcaseIcon } from './icons/AppIcons'
 import styles from './InterviewTopbar.module.css'
-
-const THEME_KEY = 'ai-coach-theme'
-
-function getStoredTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark'
-  return (localStorage.getItem(THEME_KEY) as Theme) || 'dark'
-}
 
 interface InterviewTopbarProps {
   roleTitle?: string | null
@@ -25,6 +19,12 @@ interface InterviewTopbarProps {
   onNewInterview: () => void
 }
 
+const TYPE_LABELS: Record<InterviewType, string> = {
+  intro: 'Introduction',
+  technical: 'Technical',
+  final: 'Final',
+}
+
 export function InterviewTopbar({
   roleTitle,
   company,
@@ -35,95 +35,88 @@ export function InterviewTopbar({
   onEndInterview,
   onNewInterview,
 }: InterviewTopbarProps) {
-  const [theme, setTheme] = useState<Theme>('dark')
-
-  useEffect(() => {
-    const stored = getStoredTheme()
-    setTheme(stored)
-    document.documentElement.setAttribute('data-theme', stored)
-  }, [])
-
-  const toggleTheme = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    localStorage.setItem(THEME_KEY, next)
-    document.documentElement.setAttribute('data-theme', next)
-  }
+  const { theme, toggleTheme } = useTheme()
 
   return (
-    <nav className={styles.topbar}>
-      <div className={styles.left}>
-        <span className={styles.logo} aria-hidden="true">
-          <CoachIcon size={30} />
-        </span>
-        <div className={styles.brandBlock}>
-          <Link href="/interview" className={styles.brand}>
-            Interview AI Coach
-          </Link>
-          <span className={styles.role}>
-            {roleTitle || 'Software interview practice'}
-            {company ? ` · ${company}` : ''}
+    <CoachHeader
+      titleLead="Interview"
+      titleAccent="Coach"
+      subtitle="Practice today. Create tomorrow."
+      headerBack={
+        <Link href="/" className={headerStyles.backLink}>
+          <span className={headerStyles.backArrow} aria-hidden="true">
+            ←
           </span>
-        </div>
-      </div>
-
-      <div className={styles.center}>
-        {interviewType && (
-          <span className={`${styles.typeBadge} ${styles[interviewType]}`}>
-            {interviewType === 'intro'
-              ? 'Introduction'
-              : interviewType === 'technical'
-              ? 'Technical'
-              : 'Final'}
-          </span>
-        )}
-        <Link href="/" className={styles.switchLink}>
-          English coach →
+          <span>AI Coach Home</span>
         </Link>
-      </div>
-
-      <div className={styles.right}>
+      }
+      headerActions={
         <button
           type="button"
-          className={styles.feedbackBtn}
-          onClick={onOpenFeedback}
-          aria-label="View all interview feedback"
-        >
-          <span className={styles.feedbackLabel}>All feedback</span>
-          {feedbackCount > 0 && (
-            <span className={styles.badge}>{feedbackCount}</span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          className={styles.endBtn}
-          onClick={onEndInterview}
-          disabled={ending}
-          aria-label="End interview and view report"
-        >
-          {ending ? 'Analysing…' : 'End interview'}
-        </button>
-
-        <button
-          type="button"
-          className={styles.iconBtn}
-          onClick={onNewInterview}
-          aria-label="Start a new interview"
-          title="New interview"
-        >
-          ＋
-        </button>
-
-        <button
-          type="button"
-          className={styles.iconBtn}
+          className={headerStyles.themeToggle}
           onClick={toggleTheme}
           aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>
-      </div>
-    </nav>
+      }
+      sessionIcon={<BriefcaseIcon size={24} />}
+      sessionTitle={roleTitle || 'Software interview practice'}
+      sessionMeta={
+        <>
+          {interviewType && (
+            <span className={`${styles.typeBadge} ${styles[interviewType]}`}>
+              {TYPE_LABELS[interviewType]}
+            </span>
+          )}
+          <span>{company ? `${company} · Mock interview` : 'Mock interview'}</span>
+          {feedbackCount > 0 && (
+            <>
+              <span className={headerStyles.metaDot} aria-hidden="true">
+                •
+              </span>
+              <span>
+                {feedbackCount} coaching {feedbackCount === 1 ? 'note' : 'notes'}
+              </span>
+            </>
+          )}
+        </>
+      }
+      sessionActions={
+        <>
+          <button
+            type="button"
+            className={headerStyles.pill}
+            onClick={onOpenFeedback}
+            aria-label="View all interview feedback"
+          >
+            <span>All feedback</span>
+            {feedbackCount > 0 && (
+              <span className={headerStyles.badge}>{feedbackCount}</span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className={`${headerStyles.pill} ${headerStyles.pillAccent}`}
+            onClick={onEndInterview}
+            disabled={ending}
+            aria-label="End interview and view report"
+          >
+            {ending ? 'Analysing…' : 'End interview'}
+          </button>
+
+          <button
+            type="button"
+            className={headerStyles.iconButton}
+            onClick={onNewInterview}
+            aria-label="Start a new interview"
+            title="New interview"
+          >
+            ＋
+          </button>
+        </>
+      }
+    />
   )
 }

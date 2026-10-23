@@ -56,7 +56,12 @@ async def check_omniroute() -> dict:
 async def check_tts_import() -> dict:
     try:
         import edge_tts  # noqa
-        return {"ok": True, "engine": "edge-tts"}
+        import httpx  # noqa
+        return {
+            "ok": True,
+            "engine": "edge-tts",
+            "fallback": "google-tts",
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)[:80]}
 

@@ -40,14 +40,17 @@ beforeAll(() => {
 describe('Topbar', () => {
   it('renders the brand and demo label', () => {
     render(<Topbar />)
-    expect(screen.getByText('English AI Coach')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'English Coach' })).toBeInTheDocument()
     expect(screen.getByText('Demo Version')).toBeInTheDocument()
   })
 
-  it('links to the interview coach', () => {
+  it('shows only the AI Coach Home back link instead of the old coach switcher', () => {
     render(<Topbar />)
-    const link = screen.getByRole('link', { name: 'Interview Coach' })
-    expect(link).toHaveAttribute('href', '/interview')
+
+    const home = screen.getByRole('link', { name: 'AI Coach Home' })
+    expect(home).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('link', { name: 'Interview Coach' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'All coaches' })).not.toBeInTheDocument()
   })
 
   it('opens the CEFR level menu and lists every level', () => {

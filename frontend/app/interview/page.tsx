@@ -1,14 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { AudioPlayer } from '@/components/AudioPlayer'
-import { CoachIcon } from '@/components/icons/CoachIcon'
+import { useEffect, useState } from 'react'
+import { RobotIcon } from '@/components/icons/AppIcons'
 import { InterviewFeedbackModal } from '@/components/InterviewFeedbackModal'
 import { InterviewFeedbackPanel } from '@/components/InterviewFeedbackPanel'
 import { InterviewReportModal } from '@/components/InterviewReportModal'
 import { InterviewSetupModal } from '@/components/InterviewSetupModal'
 import { InterviewTopbar } from '@/components/InterviewTopbar'
-import { LoadingIndicator } from '@/components/LoadingIndicator'
+import {
+  ChatComposer,
+  ChatEmptyState,
+  ChatErrorBanner,
+  ChatMessageList,
+  ChatShell,
+  type ChatMessageView,
+} from '@/components/chat'
+import { useAudioRecorder } from '@/hooks/useAudioRecorder'
+import { useStoredSessionId } from '@/hooks/useStoredSessionId'
 import {
   endInterview,
   getInterviewSession,
@@ -28,7 +36,6 @@ import type {
   InterviewSkillInfo,
   InterviewType,
 } from '@/types/interview'
-import chat from '../chat.module.css'
 import styles from './interview.module.css'
 
 const SESSION_KEY = 'ai-interview-session-id'
@@ -54,29 +61,12 @@ const FALLBACK_SKILLS: InterviewSkillInfo[] = [
   },
 ]
 
-function getStoredSessionId(): string {
-  if (typeof window === 'undefined') return crypto.randomUUID()
-  let sid = localStorage.getItem(SESSION_KEY)
-  if (!sid) {
-    sid = crypto.randomUUID()
-    localStorage.setItem(SESSION_KEY, sid)
-  }
-  return sid
-}
-
 function nowIso(): string {
   return new Date().toISOString()
 }
 
-function timeOf(value?: string | null): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
 export default function InterviewPage() {
-  const [sessionId, setSessionId] = useState('')
+  const sessionId = useStoredSessionId(SESSION_KEY)
   const [skills, setSkills] = useState<InterviewSkillInfo[]>([])
   const [bootLoading, setBootLoading] = useState(true)
   const [configured, setConfigured] = useState(false)
@@ -93,7 +83,6 @@ export default function InterviewPage() {
   const [busy, setBusy] = useState(false)
   const [ending, setEnding] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [recording, setRecording] = useState(false)
 
   const [setupOpen, setSetupOpen] = useState(false)
   const [setupBusy, setSetupBusy] = useState(false)
@@ -102,18 +91,19 @@ export default function InterviewPage() {
   const [reportOpen, setReportOpen] = useState(false)
   const [report, setReport] = useState<InterviewReport | null>(null)
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-
   const atLimit = messageLimit !== null && answerCount >= messageLimit
 
+  const { recording, startRecording, stopRecording } = useAudioRecorder({
+    enabled: configured && Boolean(sessionId) && !busy && !atLimit,
+    onAudio: submitAudio,
+    onError: setError,
+  })
+
   useEffect(() => {
-    const sid = getStoredSessionId()
-    setSessionId(sid)
+    if (!sessionId) return
 
     let cancelled = false
-    Promise.allSettled([getInterviewSkills(), getInterviewSession(sid)]).then(
+    Promise.allSettled([getInterviewSkills(), getInterviewSession(sessionId)]).then(
       ([skillsResult, sessionResult]) => {
         if (cancelled) return
 
@@ -158,11 +148,7 @@ export default function InterviewPage() {
     return () => {
       cancelled = true
     }
-  }, [])
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages])
+  }, [sessionId])
 
   function appendMessages(...items: InterviewMessage[]) {
     setMessages((prev) => [...prev, ...items])
@@ -224,9 +210,7 @@ export default function InterviewPage() {
   }
 
   function classifyError(err: any, fallback: string): string {
-    const message = err?.message || fallback
-    if (message.toLowerCase().includes('limit')) return message
-    return message
+    return err?.message || fallback
   }
 
   async function send(textOverride?: string) {
@@ -267,49 +251,6 @@ export default function InterviewPage() {
     } finally {
       setBusy(false)
     }
-  }
-
-  async function startRecording() {
-    if (busy || !configured || atLimit || !sessionId) return
-    setError(null)
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError('Microphone API not available in this browser.')
-      return
-    }
-    if (typeof MediaRecorder === 'undefined') {
-      setError('MediaRecorder not supported in this browser.')
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = recorder
-      chunksRef.current = []
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) chunksRef.current.push(event.data)
-      }
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop())
-        const producedType = chunksRef.current[0]?.type || 'audio/webm'
-        const blob = new Blob(chunksRef.current, { type: producedType })
-        await submitAudio(blob)
-      }
-      recorder.start()
-      setRecording(true)
-    } catch (err: any) {
-      console.error('interview mic error', err)
-      setError(
-        err?.name === 'NotAllowedError'
-          ? 'Microphone permission denied. Allow access in the browser.'
-          : 'Microphone unavailable. Check browser permissions.'
-      )
-    }
-  }
-
-  function stopRecording() {
-    const recorder = mediaRecorderRef.current
-    if (recorder && recorder.state !== 'inactive') recorder.stop()
-    setRecording(false)
   }
 
   async function submitAudio(blob: Blob) {
@@ -353,6 +294,11 @@ export default function InterviewPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  function handleStartRecording() {
+    setError(null)
+    startRecording()
   }
 
   async function handleEndInterview() {
@@ -404,119 +350,62 @@ export default function InterviewPage() {
     setSetupOpen(true)
   }
 
-  function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      if (!atLimit) send()
+  const messageViews: ChatMessageView[] = messages.map((message, index) => {
+    const isCandidate = message.role === 'candidate'
+    return {
+      id: index,
+      role: isCandidate ? 'user' : 'coach',
+      text: message.text,
+      audioSrc: message.audio_url
+        ? interviewAudioUrl(message.audio_url) || message.audio_url
+        : undefined,
+      audioLabel: isCandidate ? 'You' : 'Interviewer',
+      timestamp: message.timestamp,
+      pending: message.pending,
+      pendingLabel: 'Interviewer is typing…',
+      speakerLabel: isCandidate ? undefined : 'Interviewer',
     }
-  }
+  })
 
   return (
-    <div className={chat.chatPage}>
-      <div className={chat.topbarZone}>
-        <InterviewTopbar
-          roleTitle={brief?.role_title}
-          company={brief?.company}
-          interviewType={interviewType}
-          feedbackCount={feedbackCount}
-          ending={ending}
-          onOpenFeedback={() => setFeedbackOpen(true)}
-          onEndInterview={handleEndInterview}
-          onNewInterview={handleNewInterview}
-        />
-      </div>
-
-      <main className={chat.chatMain}>
-        <div className={chat.messagesArea}>
-          {bootLoading ? (
-            <div className={chat.empty}>
-              <LoadingIndicator />
-              <div className={chat.emptyHint}>Loading your interview…</div>
-            </div>
-          ) : messages.length === 0 ? (
-            <div className={chat.empty}>
-              <div className={chat.emptyEmoji}>
-                <CoachIcon size={64} />
-              </div>
-              <div className={chat.emptyTitle}>Set up your interview</div>
-              <div className={chat.emptyHint}>
-                Add the job offer and choose Introduction, Technical or Final. The
-                interviewer will simulate the conversation and coach every answer.
-              </div>
-              <button
-                type="button"
-                className={styles.setupCta}
-                onClick={() => setSetupOpen(true)}
-              >
-                Add a job offer
-              </button>
-            </div>
-          ) : (
-            messages.map((message, index) => {
-              const isCandidate = message.role === 'candidate'
-              return (
-                <div
-                  key={index}
-                  className={`${chat.message} ${
-                    isCandidate ? chat.messageUser : chat.messageCoach
-                  }`}
+    <>
+      <ChatShell
+        topbar={
+          <InterviewTopbar
+            roleTitle={brief?.role_title}
+            company={brief?.company}
+            interviewType={interviewType}
+            feedbackCount={feedbackCount}
+            ending={ending}
+            onOpenFeedback={() => setFeedbackOpen(true)}
+            onEndInterview={handleEndInterview}
+            onNewInterview={handleNewInterview}
+          />
+        }
+      >
+        <ChatMessageList
+          messages={messageViews}
+          loading={bootLoading}
+          loadingLabel="Loading your interview…"
+          emptyState={
+            <ChatEmptyState
+              icon={<RobotIcon size={64} />}
+              title="Set up your interview"
+              hint="Add the job offer and choose Introduction, Technical or Final. The interviewer will simulate the conversation and coach every answer."
+              action={
+                <button
+                  type="button"
+                  className={styles.setupCta}
+                  onClick={() => setSetupOpen(true)}
                 >
-                  {!isCandidate && (
-                    <span className={styles.speaker}>
-                      Interviewer
-                      {brief?.role_title ? ` · ${brief.role_title}` : ''}
-                    </span>
-                  )}
-                  <div
-                    className={`${chat.bubble} ${
-                      isCandidate ? chat.bubbleUser : chat.bubbleCoach
-                    }`}
-                    data-pending={message.pending ? 'true' : 'false'}
-                  >
-                    {message.pending && !message.text ? (
-                      <LoadingIndicator />
-                    ) : message.text ? (
-                      <div className={chat.bubbleText}>{message.text}</div>
-                    ) : null}
+                  Add a job offer
+                </button>
+              }
+            />
+          }
+        />
 
-                    {!message.pending && message.audio_url && (
-                      <div
-                        className={`${chat.bubbleAudio} ${
-                          isCandidate ? chat.bubbleUser : chat.bubbleCoach
-                        }`}
-                        data-audio-bubble={isCandidate ? 'user' : 'coach'}
-                      >
-                        <AudioPlayer
-                          src={interviewAudioUrl(message.audio_url) || message.audio_url}
-                          variant={isCandidate ? 'user' : 'coach'}
-                        />
-                      </div>
-                    )}
-
-                    <div className={chat.bubbleMeta}>
-                      {message.pending && (
-                        <span className={chat.pendingDot} aria-hidden="true" />
-                      )}
-                      <span className={chat.timestamp}>
-                        {timeOf(message.timestamp)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {error && (
-          <div className={chat.errorBanner} role="alert">
-            <span>⚠️ {error}</span>
-            <button type="button" onClick={() => setError(null)}>
-              Dismiss
-            </button>
-          </div>
-        )}
+        <ChatErrorBanner message={error} onDismiss={() => setError(null)} />
 
         {configured &&
           (latestFeedback.length > 0 || latestScore !== null) && (
@@ -528,96 +417,26 @@ export default function InterviewPage() {
           )}
 
         {configured && (
-          <div className={chat.inputArea}>
-            <div
-              className={`${chat.inputWrapper} ${
-                atLimit ? chat.inputBlocked : ''
-              }`}
-            >
-              <textarea
-                className={chat.textInput}
-                placeholder={
-                  atLimit
-                    ? 'Practice limit reached. Start a new interview to continue.'
-                    : 'Type your answer — Enter to send, Shift+Enter for a new line'
-                }
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={onKeyDown}
-                rows={1}
-                disabled={atLimit || busy || recording}
-                aria-label="Your answer"
-              />
-              {input.trim().length > 0 ? (
-                <button
-                  type="button"
-                  className={`${chat.iconBtn} ${chat.sendBtn}`}
-                  onClick={() => send()}
-                  disabled={busy || atLimit || recording}
-                  aria-label="Send answer"
-                  title="Send (Enter)"
-                >
-                  <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-                    <path d="M2 8l12-6-3 14-3-6-6-2z" fill="currentColor" />
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={`${chat.iconBtn} ${chat.micBtn}`}
-                  onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onMouseLeave={() => recording && stopRecording()}
-                  onTouchStart={startRecording}
-                  onTouchEnd={stopRecording}
-                  disabled={busy || atLimit}
-                  data-recording={recording ? 'true' : 'false'}
-                  aria-label={
-                    recording ? 'Recording — release to send' : 'Hold to record your answer'
-                  }
-                  title="Hold to record your answer"
-                >
-                  <svg
-                    viewBox="0 0 16 16"
-                    width="18"
-                    height="18"
-                    aria-hidden="true"
-                    fill="currentColor"
-                  >
-                    <path d="M8 1a3 3 0 00-3 3v4a3 3 0 006 0V4a3 3 0 00-3-3zM3 8a5 5 0 0010 0h-1a4 4 0 11-8 0H3zM8 13a1 1 0 011 1v1H7v-1a1 1 0 011-1z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            {atLimit && (
-              <p className={chat.inputBlockedMessage}>
-                Practice limit reached. Start a new interview to keep going.
-              </p>
-            )}
-            <div className={chat.resetRow}>
-              <button
-                type="button"
-                className={chat.resetBtn}
-                onClick={handleNewInterview}
-                disabled={busy}
-              >
-                Start a new interview
-              </button>
-              <span className={styles.dot} aria-hidden="true">
-                ·
-              </span>
-              <button
-                type="button"
-                className={chat.resetBtn}
-                onClick={handleEndInterview}
-                disabled={busy || ending}
-              >
-                {ending ? 'Preparing report…' : 'End interview and get report'}
-              </button>
-            </div>
-          </div>
+          <ChatComposer
+            value={input}
+            onChange={setInput}
+            onSend={() => send()}
+            placeholder="Type your answer — Enter to send, Shift+Enter for a new line"
+            limitPlaceholder="Practice limit reached. Start a new interview to continue."
+            limitMessage="Practice limit reached. Start a new interview to keep going."
+            inputLabel="Your answer"
+            sendAriaLabel="Send answer"
+            recordAriaLabel="Hold to record your answer"
+            recordingAriaLabel="Recording — release to send"
+            busy={busy}
+            atLimit={atLimit}
+            disabled={atLimit || busy || recording}
+            recording={recording}
+            onStartRecording={handleStartRecording}
+            onStopRecording={stopRecording}
+          />
         )}
-      </main>
+      </ChatShell>
 
       <InterviewSetupModal
         open={setupOpen}
@@ -648,6 +467,6 @@ export default function InterviewPage() {
           await handleNewInterview()
         }}
       />
-    </div>
+    </>
   )
 }

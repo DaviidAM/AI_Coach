@@ -1,4 +1,5 @@
 import pytest
+import httpx
 from unittest.mock import patch, MagicMock, AsyncMock
 from pathlib import Path
 import tempfile
@@ -88,7 +89,9 @@ class TestSynthesize:
 
         with patch("app.tts.edge_tts.Communicate") as mock_comm:
             comm_instance = AsyncMock()
-            comm_instance.save = AsyncMock()
+            comm_instance.save = AsyncMock(
+                side_effect=lambda path: Path(path).write_bytes(b"ID3fake")
+            )
             mock_comm.return_value = comm_instance
 
             await tts_module.synthesize("Hello world", output_path, voice="en-US-AriaNeural")
@@ -103,7 +106,9 @@ class TestSynthesize:
 
         with patch("app.tts.edge_tts.Communicate") as mock_comm:
             comm_instance = AsyncMock()
-            comm_instance.save = AsyncMock()
+            comm_instance.save = AsyncMock(
+                side_effect=lambda path: Path(path).write_bytes(b"ID3fake")
+            )
             mock_comm.return_value = comm_instance
 
             await tts_module.synthesize("Hello", output_path)
@@ -117,12 +122,63 @@ class TestSynthesize:
 
         with patch("app.tts.edge_tts.Communicate") as mock_comm:
             comm_instance = AsyncMock()
-            comm_instance.save = AsyncMock()
+            comm_instance.save = AsyncMock(
+                side_effect=lambda path: Path(path).write_bytes(b"ID3fake")
+            )
             mock_comm.return_value = comm_instance
 
             await tts_module.synthesize("Test", output_path, voice="en-GB-SoniaNeural")
 
             mock_comm.assert_called_once_with("Test", "en-GB-SoniaNeural")
+
+
+class TestTTSFallback:
+    """Google fallback keeps audio available when Edge TTS is blocked."""
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_google_when_edge_fails(self, tmp_path):
+        output_path = tmp_path / "fallback.mp3"
+
+        with (
+            patch(
+                "app.tts._synthesize_impl",
+                new=AsyncMock(side_effect=RuntimeError("403 Forbidden")),
+            ),
+            patch(
+                "app.tts._synthesize_google",
+                new=AsyncMock(return_value=b"ID3google-audio"),
+            ),
+        ):
+            await tts_module.synthesize("Hello world", output_path)
+
+        assert output_path.read_bytes() == b"ID3google-audio"
+
+    @pytest.mark.asyncio
+    async def test_raises_when_all_engines_fail(self, tmp_path):
+        output_path = tmp_path / "missing.mp3"
+
+        with (
+            patch(
+                "app.tts._synthesize_impl",
+                new=AsyncMock(side_effect=RuntimeError("403 Forbidden")),
+            ),
+            patch(
+                "app.tts._synthesize_google",
+                new=AsyncMock(side_effect=RuntimeError("network down")),
+            ),
+        ):
+            with pytest.raises(tts_module.TTSUnavailable):
+                await tts_module.synthesize("Hello world", output_path)
+
+        assert not output_path.exists()
+
+    def test_google_chunks_respect_endpoint_limit(self):
+        text = "This is a longer sentence. " * 40
+        chunks = tts_module._split_for_google(text)
+
+        assert chunks
+        assert all(len(chunk) <= tts_module._GOOGLE_CHUNK_LIMIT for chunk in chunks)
+        assert "".join(chunks).replace(" ", "") == text.replace(" ", "").strip()
 
 
 # ------------------------------------------------------------------
@@ -333,6 +389,64 @@ class TestChatAudioValidation:
         assert "either text or audio" in response.json()["detail"].lower()
 
 
+class TestChatResilience:
+    """A provider failure must not turn a chat turn into an HTTP 500."""
+
+    def test_tts_failure_still_returns_the_text_turn(
+        self, client, isolate_audio_dirs
+    ):
+        with (
+            patch(
+                "app.api.chat.synthesize",
+                new=AsyncMock(side_effect=RuntimeError("TTS blocked")),
+            ),
+            patch(
+                "app.api.chat.get_llm_reply",
+                return_value=({"reply": "Hello! How are you?", "corrections": []}, None),
+            ),
+        ):
+            response = client.post(
+                "/api/chat",
+                data={"session_id": "tts-failure-session", "text": "Hi coach"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["coach_text"] == "Hello! How are you?"
+        assert data["user_audio_url"] is None
+        assert data["coach_audio_url"] is None
+
+    def test_omniroute_connection_error_falls_back_to_offline_coach(
+        self, client, isolate_audio_dirs
+    ):
+        async def fake_synthesize(text: str, output_path: Path, voice: str = "") -> None:
+            Path(output_path).write_bytes(b"ID3fake")
+
+        with (
+            patch("app.api.chat.synthesize", new=fake_synthesize),
+            patch.dict("os.environ", {"MINIMAX_API_KEY": ""}),
+            patch("app.llm.httpx.Client") as mock_client_cls,
+        ):
+            mock_client = mock_client_cls.return_value.__enter__.return_value
+            mock_client.post.side_effect = httpx.ConnectError(
+                "All connection attempts failed"
+            )
+            response = client.post(
+                "/api/chat",
+                data={
+                    "session_id": "omniroute-down-session",
+                    "text": "I goed to the store yesterday",
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["coach_text"]
+        assert data["user_audio_url"]
+        assert data["coach_audio_url"]
+        assert response.headers.get("X-Fallback")
+
+
 class TestSTTValidation:
     """Tests for STT input validation."""
 
@@ -397,16 +511,19 @@ class TestTTSPath:
         for f in self.audio_dir.glob("*.mp3"):
             f.unlink(missing_ok=True)
 
-    def test_text_input_produces_audio_file(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_text_input_produces_audio_file(self, tmp_path):
         """Text input -> audio file generated at expected path."""
         output_path = self.audio_dir / "test_output.mp3"
 
-        with patch("asyncio.run"):
-            tts_module.synthesize("Hello world", output_path)
+        async def fake_edge(text: str, path: Path, voice: str) -> None:
+            Path(path).write_bytes(b"ID3fake")
 
-        # Synthesize is mocked, but verify the path was passed correctly
-        # (actual file not created due to mock)
-        assert output_path.suffix == ".mp3"
+        with patch("app.tts._synthesize_impl", side_effect=fake_edge):
+            await tts_module.synthesize("Hello world", output_path)
+
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
 
     @pytest.mark.asyncio
     async def test_synthesize_produces_valid_file_structure(self, tmp_path):
@@ -415,7 +532,9 @@ class TestTTSPath:
 
         with patch("app.tts.edge_tts.Communicate") as mock_comm:
             comm_instance = AsyncMock()
-            comm_instance.save = AsyncMock()
+            comm_instance.save = AsyncMock(
+                side_effect=lambda path: Path(path).write_bytes(b"ID3fake")
+            )
             mock_comm.return_value = comm_instance
 
             await tts_module.synthesize("Test text", output_path)
@@ -432,7 +551,9 @@ class TestTTSPath:
         output_path = self.audio_dir / "voice_test.mp3"
         with patch("app.tts.edge_tts.Communicate") as mock_comm:
             comm_instance = AsyncMock()
-            comm_instance.save = AsyncMock()
+            comm_instance.save = AsyncMock(
+                side_effect=lambda path: Path(path).write_bytes(b"ID3fake")
+            )
             mock_comm.return_value = comm_instance
 
             await tts_module.synthesize("Hello", output_path)

@@ -1,14 +1,15 @@
 # Interview Coach
 
-The Interview Coach is the second route in AI Coach (`/interview`). It runs a
-tailored practice interview for a real job offer and coaches every answer. It
-does not change the English coach at `/`; sessions, limits and prompts are
-separate.
+The Interview Coach is a dedicated route in AI Coach (`/interview`). It runs a
+tailored practice interview for a real job offer and coaches every answer. The
+English Coach lives at `/english` and the coach selector at `/`; the two
+coaches have separate sessions, limits, prompts and UI state.
 
 ## Quick start
 
 1. Start the backend and frontend as described in the [README](../README.md).
-2. Open <http://localhost:3000/interview>.
+2. Open <http://localhost:3000/interview> in local development, or
+   <http://localhost:18101/interview> with Docker Compose.
 3. Paste a job offer or upload `.txt`, `.md`, `.pdf` or `.docx` (up to 5 MB).
 4. Choose **Introduction**, **Technical** or **Final**.
 5. Answer by typing or holding the microphone button. Each answer gets live
@@ -19,6 +20,14 @@ The setup popup is mandatory on first entry. Once an interview is configured,
 the browser stores its session id in `localStorage` under
 `ai-interview-session-id` and restores the conversation on reload. The backend
 keeps sessions in memory, so a backend restart clears them.
+
+## Navigation
+
+Both coach headers include a **← AI Coach Home** link in the top-left corner.
+The Interview header also provides **All feedback**, **End interview** and
+**New interview** actions. There is no cross-coach switcher; use the home page
+or the back link to move between the English and Interview Coaches. The setup
+modal's fallback link also returns to the landing page.
 
 ## Interview stages
 
@@ -42,10 +51,11 @@ usable.
 The candidate can send text or audio:
 
 - **Audio** is transcribed with the same faster-whisper STT path as the
-  English coach. The original recording is kept for playback.
+  English Coach. The original recording is kept for playback.
 - **Text** is also synthesized to audio so both bubbles support playback.
 - The interviewer's reply is generated as one in-character question, then
-  synthesized with edge-tts. TTS is best-effort: if it fails, the text turn
+  synthesized with edge-tts. If Edge TTS is blocked upstream, Google TTS is
+  used as a fallback. TTS is best-effort: if both engines fail, the text turn
   still succeeds and no audio URL is returned.
 
 Coaching is returned alongside the interviewer reply and never spoken by the
@@ -85,12 +95,26 @@ the backend restarts.
 - LLM setup, turn and report failures fall back to rule-based output. The
   interview remains usable offline with text only.
 - Interview audio is saved under the same static audio directory as the
-  English coach and is cleaned up by the existing audio janitor.
+  English Coach and is cleaned up by the existing audio janitor.
+- The interview session is independent from the English session. Resetting or
+  ending an interview does not clear English corrections or messages.
 
 ## API
 
+All endpoints are prefixed with `/api/interview`:
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/skills` | List stages and the current answer limit. |
+| `POST` | `/setup` | Configure the interview from `job_text` or `job_file`. |
+| `GET` | `/session?session_id=...` | Restore messages, feedback, scores and report. |
+| `POST` | `/chat` | Send a candidate answer as text or audio. |
+| `GET` | `/feedback?session_id=...&limit=20&offset=0` | Paginated feedback history. |
+| `POST` | `/report?session_id=...` | Generate and store the practice report. |
+| `POST` | `/reset?session_id=...&keep_setup=true` | Clear progress; `keep_setup=false` requires a new setup. |
+
 See the [Interview Coach API section](../README.md#interview-coach-api) in the
-README for the endpoint list. The frontend client is
+README for request details. The frontend client is
 `frontend/lib/interview-api.ts`, and the types are in
 `frontend/types/interview.ts`.
 
@@ -99,7 +123,8 @@ README for the endpoint list. The frontend client is
 | Symptom | Likely cause |
 |---|---|
 | The setup popup asks for the same offer after reload | The backend restarted and lost the in-memory session. |
-| No interviewer audio | edge-tts was unavailable; the text reply still works. |
+| No interviewer audio | Both edge-tts and Google TTS were unavailable; the text reply still works. |
 | "Could not transcribe the audio" | STT failed or the recording was empty. Type the answer or retry. |
 | The report is rule-based and mentions no language model | The LLM call failed; the report is built from stored scores and feedback. |
-| Audio keeps failing with 403 | edge-tts was rejected upstream; check the backend logs. The interview itself is unaffected. |
+| Audio keeps failing with 403 | edge-tts was rejected upstream. The backend should retry with Google TTS automatically; check the logs if both engines fail. The interview itself is unaffected. |
+| The header shows no way to switch coaches | Use **← AI Coach Home** or open `/` and choose a coach card. |

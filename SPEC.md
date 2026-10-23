@@ -1,8 +1,11 @@
-# AI Coach — Spec (v2)
+# AI Coach — Product and Technical Spec
 
-Voice + text AI English teacher with progressive correction by CEFR level (A1–C2).
-Stack: Next.js 14 (frontend, TypeScript, Tailwind) + FastAPI (backend, Python, uv-managed) + LLM via MiniMax.
-Deploy target: Render (`ai-coach-pnf5.onrender.com` currently runs the old Gradio version).
+Current implementation spec for the AI Coach demo: an English conversation
+coach and an Interview Coach, both with text and audio, served by a Next.js
+frontend and a FastAPI backend.
+
+Stack: Next.js 14 (App Router, TypeScript, CSS Modules) + FastAPI (Python
+3.11+, uv-managed) + LLM routing through OmniRoute.
 
 ---
 
@@ -10,104 +13,169 @@ Deploy target: Render (`ai-coach-pnf5.onrender.com` currently runs the old Gradi
 
 ### 1.1 What the user sees
 
-A WhatsApp-style chat interface. The user types OR holds-to-records audio.
-Whatever they send — text OR audio — is **always converted to both formats** before
-reaching the COACH (the backend agent). The COACH replies in text, and the text
-is **automatically converted to audio** that plays the moment the response arrives.
+The root page (`/`) is a coach selector with two cards:
+
+- **English Coach** (`/english`) — free-form English conversation practice
+  with CEFR-aware corrections.
+- **Interview Coach** (`/interview`) — a tailored mock interview based on a
+  job offer, with feedback after every answer.
+
+Both interfaces use the same dark/light forest-green design, responsive chat
+shell and text-plus-audio message contract. Each coach has its own session and
+message limit. The top-left of both coach headers links back to `/`; there are
+no cross-coach switcher buttons.
 
 ### 1.2 Input/output format contract
 
 | User sends | Pipeline | User sees in chat | Backend sees |
 |---|---|---|---|
-| Text | TTS (text → audio) | Both text + audio (audio plays) | Both text + audio |
-| Audio | STT (audio → text) | Both text + audio (audio plays) | Both text + audio |
+| Text | TTS (text → audio) | Text + audio | Text + audio |
+| Audio | STT (audio → text) + original recording | Text + audio | Text + audio |
 
-**The COACH's reply**: text + auto-generated TTS audio. The audio plays automatically.
+The coach reply is always text, plus TTS audio when an engine is available.
+Audio is best-effort: if every TTS engine fails, the turn still succeeds with
+text and no audio URL. Audio failures never turn a chat turn into HTTP 500.
 
-### 1.3 The COACH
+### 1.3 English Coach
 
-The COACH is the backend agent. Behaviour:
+The English Coach is a backend agent that:
 
-1. **Continues the conversation** with the user (free-form, in English).
-2. **Extracts errors** from the user's message. Each error has a CEFR level
-   (A1/A2/B1/B2/C1/C2). Errors are graded; only errors at or below the user's
-   selected level are shown.
-3. Returns a structured response containing:
-   - `reply`: the text the COACH says next (free-form).
-   - `corrections`: list of errors detected, each with:
-     - `original_phrase`: what the user wrote/said.
-     - `corrected_phrase`: the corrected version.
-     - `explanation`: short, clear explanation in English of the rule.
-     - `error_level`: CEFR bucket (`A1`...`C2`).
-     - `category`: optional taxonomy (`grammar`, `vocabulary`, `spelling`, `style`, `word_order`, ...).
+1. Continues the conversation naturally in English.
+2. Detects errors in the student's message and returns a structured list.
+3. Grades each error with a CEFR level (A1–C2).
+4. Returns only corrections at or below the student's selected level.
 
-### 1.4 Level filtering
+The English UI shows:
 
-The user selects an English level (A1–C2) in the top bar.
+- A topbar with the **AI Coach Home** link, theme toggle, CEFR level selector,
+  demo-usage indicator and an **All Corrections** button.
+- A WhatsApp-style message list with text and an inline audio player when
+  available.
+- A live "Corrections for last message" panel.
+- An **All Corrections** modal with sorting, pagination and PDF export.
+- A composer with text input, hold-to-record mic, Enter-to-send and a reset
+  action once the conversation has started.
 
-- If user level = B2 and error level = C1 → **do not show** (above user level).
-- If user level = B2 and error level = B1 → **show** (at or below user level).
-- Edge case: A1 = absolute beginner, only A1 errors shown. C2 = all errors shown.
+The CEFR level is stored per session. The default level is `A1`. Changing it
+affects subsequent turns; the backend filters corrections before returning
+them.
 
-Filtering happens in the backend, not the frontend, so the user can't inspect the
-full payload.
+### 1.4 Interview Coach
 
-### 1.5 Error display
+The Interview Coach runs a tailored practice interview for a real job offer.
+The setup modal is mandatory on first entry. The user pastes an offer or
+uploads `.txt`, `.md`, `.pdf` or `.docx` (up to 5 MB), then chooses:
 
-Two places:
+| Stage | ID | Focus |
+|---|---|---|
+| Introduction | `intro` | Career story, relevance, motivation, communication and fit. |
+| Technical | `technical` | Correctness, depth, design, trade-offs, testing, failure modes and handling unknowns. |
+| Final | `final` | Ownership, measurable impact, conflict, failure, leadership, prioritisation and closing. |
 
-1. **Bottom of the chat (live panel)**: errors for the *current* message. Cleared
-   when a new message is sent. Shows up to N corrections (default 5).
-2. **Second tab (history)**: all errors from the whole conversation, in chronological
-   order. Pagination 20 per page. Marked with timestamp.
+The technical stage adapts to the inferred role track: software engineering,
+data, AI/ML, architecture or technical lead. The role title, company,
+seniority, key skills and offer digest are inferred from the offer. If the LLM
+is unavailable, heuristic extraction keeps the interview usable.
+
+Each answer receives:
+
+- an in-character interviewer reply (the next question),
+- a 1–5 answer score,
+- coaching notes with category, severity, evidence, issue, why it matters and
+  a concrete stronger answer.
+
+**End interview** generates a practice report with an overall score, readiness
+label (`not_ready`, `getting_there`, `interview_ready`), summary, strengths,
+gaps and next steps. Readiness is a practice signal, not a hire/no-hire
+decision.
 
 ---
 
 ## 2. Technical architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│  Next.js 14 (App Router, TypeScript, Tailwind, SWR)      │
-│  /                   → Chat tab                          │
-│  /?tab=feedback      → All-corrections tab               │
-│  /api/*              → proxies to FastAPI                 │
-└──────────────────────────┬───────────────────────────────┘
-                           │ HTTPS
-┌──────────────────────────▼───────────────────────────────┐
-│  FastAPI (Python 3.11, managed with uv, pyproject.toml)  │
-│                                                          │
-│  /api/health                       GET  (liveness)       │
-│  /api/chat                         POST (text or audio)  │
-│  /api/corrections                  GET  (history)        │
-│  /api/level                        POST (set CEFR)       │
-│  /api/level                        GET  (current)        │
-│  /api/conversation/reset           POST                  │
-│  /api/conversation/summary         GET                   │
-└──────────────────────────┬───────────────────────────────┘
-                           │
-       ┌───────────────────┼───────────────────┐
-       ▼                   ▼                   ▼
-  STT (faster-whisper)  TTS (edge-tts or  LLM (MiniMax-M2.7-highspeed)
-   audio → text          Piper TTS)        via chat completions
-                        text → audio       returns {reply, corrections}
-```
-
-### 2.1 Backend deps
+### 2.1 Repository layout
 
 ```
-fastapi, uvicorn[standard], pydantic, pydantic-settings
-httpx                   # LLM client
-faster-whisper          # STT (CPU OK)
-edge-tts                # TTS, free Microsoft Edge voices
-python-multipart        # audio upload
-APScheduler             # optional: scheduled feedback digest
-pytest, pytest-asyncio  # dev
+frontend/
+  app/page.tsx                 landing
+  app/english/                 English Coach route
+  app/interview/               Interview Coach route
+  components/chat/             shared chat primitives
+  components/Topbar.tsx        English header
+  components/Interview*.tsx    interview setup/feedback/report UI
+  hooks/                       recorder, session id, theme
+  lib/                         API clients and localStorage session helper
+  types/                       shared TypeScript models
+  __tests__/                   Jest + Testing Library
+
+backend/
+  app/api/                     chat, level, corrections, conversation,
+                               settings, health, interview routers
+  app/interview/               store, offer parser, LLM orchestration,
+                               prompts and stage-specific skills
+  app/main.py                  app assembly, /api/config, static audio mount
+  app/session.py               English in-memory session store
+  app/llm.py                   provider dispatch and fallbacks
+  app/stt.py                   faster-whisper transcription
+  app/tts.py                   edge-tts + Google TTS fallback
+  app/filter.py                CEFR correction filter
+  app/audio_janitor.py         stale-audio cleanup
+  tests/                       pytest suites
 ```
 
-### 2.2 LLM call shape
+See [ARCHITECTURE.md](ARCHITECTURE.md) for diagrams and request flows.
 
-The backend calls the LLM with a strict JSON response schema. The system prompt
-defines the COACH persona + the error-grading rubric. Example payload:
+### 2.2 Frontend
+
+- Next.js App Router with three routes: `/`, `/english`, `/interview`.
+- Shared chat primitives live in `components/chat/`; the two coach pages adapt
+  their API models to `ChatMessageView` and provide their own panels/actions.
+- `components/chat/CoachHeader.tsx` provides the shared header layout with a
+  left back slot and right action slot. Each coach renders **← AI Coach Home**
+  and the theme toggle there.
+- Sessions are browser-generated UUIDs stored in `localStorage`:
+  - English: `ai-coach-session-id`
+  - Interview: `ai-interview-session-id`
+- `NEXT_PUBLIC_API_URL` defaults to empty, so browser requests use relative
+  `/api/*` URLs. Next.js rewrites them to `BACKEND_URL` (default
+  `http://backend:8091`).
+
+### 2.3 Backend
+
+FastAPI routers:
+
+| Router | Prefix |
+|---|---|
+| `api/chat.py` | `/api/chat` |
+| `api/level.py` | `/api/level` |
+| `api/corrections.py` | `/api/corrections` |
+| `api/conversation.py` | `/api/conversation` |
+| `api/settings.py` | `/api/settings` |
+| `api/health.py` | `/api` |
+| `api/interview.py` | `/api/interview` |
+| app-level | `/api/config` |
+
+`app/main.py` also mounts `/static` so generated audio and uploaded recordings
+are available under `/static/audio/` and `/static/audio/stt/`. CORS is enabled
+for all origins in the current demo.
+
+### 2.4 Audio pipeline
+
+1. Text input: synthesize the user text, then run the LLM and synthesize the
+   coach reply.
+2. Audio input: save the original recording, transcribe it with
+   faster-whisper (`base`, CPU, int8), run the LLM and synthesize the coach
+   reply.
+3. TTS order: edge-tts (`en-US-AriaNeural`) → Google Translate TTS (chunked).
+4. If both TTS engines fail, return text with no audio URL.
+5. STT failure returns a controlled `502`; unsupported MIME types return `422`.
+
+The audio janitor deletes `.mp3`, `.wav` and `.webm` files older than
+`AUDIO_MAX_AGE_SECONDS` every `AUDIO_CLEANUP_INTERVAL_SECONDS`.
+
+### 2.5 LLM contract and fallback
+
+English turns request JSON with:
 
 ```json
 {
@@ -124,216 +192,247 @@ defines the COACH persona + the error-grading rubric. Example payload:
 }
 ```
 
-If the LLM returns malformed JSON, the backend retries once with a "fix JSON"
-prompt. If still malformed, returns 502 to the client with a sanitized message.
+The backend validates the JSON, filters corrections by CEFR level and stores
+them for the history endpoint. Malformed JSON is retried once; if it is still
+malformed, the API returns `502`.
 
-### 2.3 Level filtering (backend)
+Provider defaults:
 
 ```python
-CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
-
-def filter_corrections(corrections: list, user_level: str) -> list:
-    cutoff = CEFR_ORDER.index(user_level)
-    return [c for c in corrections if CEFR_ORDER.index(c.error_level) <= cutoff]
+{"provider": "omniroute", "model": "auto/best-chat"}
 ```
 
-### 2.4 Audio handling
+- OmniRoute 401/404 retries once with `OMNIROUTE_DEFAULT_COMBO_FALLBACK`
+  (default `primary-chain`).
+- Transport errors, missing keys and other provider failures fall back to
+  MiniMax when `MINIMAX_API_KEY` is set, then to the rule-based offline coach.
+- Fallback responses include `X-Fallback` with the reason.
+- `/api/health` reports `omniroute.ok = false` and an aggregate `degraded`
+  status when the gateway is unreachable.
 
-- **Input**: client sends multipart with `text` (optional) and `audio` (optional).
-  Exactly one of the two must be present.
-- If `text`: backend generates TTS once to return alongside the COACH reply.
-- If `audio`: backend runs STT (faster-whisper, base model, CPU) to get the text,
-  generates TTS for the user's transcribed text (so the user sees/hears their own
-  message rendered back), then calls the LLM, then generates TTS for the COACH's reply.
-- **Output**: backend returns JSON `{user_text, user_audio_url, coach_text, coach_audio_url, corrections}`.
-  Audio files are served as static files under `/static/audio/` with a UUID filename.
+### 2.6 Session state and limits
 
-### 2.5 Audio playback
+English:
 
-Frontend uses HTML5 `<audio autoplay>` on the coach's audio URL. Mobile browsers
-require a user gesture before autoplay; we surface a small "Tap to enable audio"
-CTA on first load that requests the necessary permission. The COACH audio plays
-on every new message after that.
+- In-memory `SessionStore`, keyed by browser session id.
+- Default CEFR level `A1`.
+- Latest 10 messages retained for LLM context.
+- Settings (provider/model) stored per session.
+- Correction history is a separate in-memory store.
+- `POST /api/conversation/reset` clears messages; the frontend also clears its
+  visible messages and correction list. The correction store is cleared on
+  backend restart.
+- No TTL eviction is currently implemented; sessions live for the backend
+  process lifetime.
 
-### 2.6 Conversation memory
+Interview:
 
-Backend stores conversation state in-process (a dict keyed by session_id, stored
-in a cookie). Each message is appended to a list. The LLM is called with the
-last N messages (default N=10, configurable). Session expires after 30 min idle.
+- Separate `InterviewStore`, keyed by its own session id.
+- Latest 64 messages retained.
+- Candidate answer count tracked separately.
+- Feedback, scores, strengths and report stored per session.
+- `INTERVIEW_MESSAGE_LIMIT` default `20`, `-1` unlimited.
+- Sessions are cleared by backend restart or an interview reset.
 
-If you want persistence, switch the dict for SQLite — not required for v2.
+Demo limits:
+
+- `DEMO_MESSAGE_LIMIT` default `5`; `-1` unlimited.
+- The English UI disables input at the cap and the backend returns `429`.
+- `GET /api/config` exposes the runtime limit so the frontend does not need a
+  rebuild when the environment changes.
 
 ---
 
-## 3. Frontend spec
+## 3. API spec
 
-### 3.1 Layout
+### 3.1 Core endpoints
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ 🎯 AI Coach  │ English · voice & text  │ [A2 ▼]  ☀/🌙 │ ← topbar (level + theme)
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  [user]  Hey coach, I goed to the market yesterday       │
-│          🔊 (play)                                       │
-│                                                          │
-│  [coach] Great! What did you buy?                        │
-│          🔊 (autoplay)                                   │
-│                                                          │
-│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─   │
-│  [ Live corrections for last message ]                   │
-│  • "I goed" → "I went"  (A2 grammar)                     │
-│  • "the market yesterday" → "...yesterday at the market" │
-│    (B1 word order)                                       │
-│                                                          │
-│  [Hold to record 🎙]   [Type a message...     ] [Send ➤] │
-└──────────────────────────────────────────────────────────┘
-       Tab 1: Chat (above)  |  Tab 2: All corrections
+#### `GET /api/health`
+
+Returns `200` with aggregated status:
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "checks": {
+    "session_store": {"ok": true},
+    "audio_writable": {"ok": true},
+    "omniroute": {"ok": true},
+    "tts_import": {"ok": true, "engine": "edge-tts", "fallback": "google-tts"},
+    "stt_import": {"ok": true, "engine": "faster-whisper"},
+    "database": {"ok": true}
+  }
+}
 ```
 
-### 3.2 Components
+`status` is `degraded` when any check reports `ok: false`; the endpoint itself
+still returns `200`.
 
-- `<Topbar>` — logo, brand, level selector (chips A1–C2), theme toggle (dark/light, persistent in localStorage).
-- `<ChatList>` — message bubbles, user right + indigo accent, coach left + neutral, timestamp on hover.
-- `<AudioBubble>` — play/pause button, waveform (optional), duration.
-- `<CorrectionPanel>` — fixed bottom panel above the input row, list of corrections for the current message.
-- `<MessageInput>` — text input + hold-to-record mic button. While holding: visual recording indicator.
-- `<TabBar>` — Chat | Corrections-history.
-- `<CorrectionHistory>` — full list of corrections for the session, paginated, with timestamps.
+#### `GET /api/config`
 
-### 3.3 Design
+```json
+{"demo_message_limit": 5, "unlimited": false}
+```
 
-- Daviid default palette: indigo `#6366F1` + cyan `#22D3EE` on `#0A0A0F` for dark, off-white for light.
-- Font: Inter (UI) + JetBrains Mono (URLs, timestamps).
-- Mobile-first: input row stacks, mic button full-width, level selector collapses to a dropdown under 480px.
-- Light/dark toggle persisted in localStorage as `ai-coach-theme`.
+#### `POST /api/chat`
 
-### 3.4 Audio recording
+Multipart form:
 
-Use `MediaRecorder` API on the browser. Output `audio/webm;codecs=opus` (or `audio/ogg` on Firefox).
-While recording, show a pulsing red dot. On release, POST to `/api/chat` with `audio` multipart field.
-If `MediaRecorder` is unavailable (very old browsers), fall back to file-upload picker.
-
-### 3.5 Accessibility
-
-- ARIA labels on all interactive elements.
-- Keyboard shortcut: `Ctrl+Enter` to send text.
-- Color contrast ≥ 4.5:1 for body text.
-- axe-core sweep must pass before merge.
-
----
-
-## 4. API spec (REST)
-
-### `GET /api/health`
-
-Always 200, body `{"status": "ok", "version": "x.y.z"}`. Used by stillalive-dashboard ping.
-
-### `POST /api/chat`
-
-Request (multipart):
-- `text` (optional, string): text message from user.
-- `audio` (optional, file): audio message from user.
-- `session_id` (optional, string): conversation id, defaults to a new UUID.
+- `session_id` (required, string)
+- `text` (optional, string) — exactly one of `text` or `audio`
+- `audio` (optional, file) — exactly one of `audio` or `text`
 
 Response:
+
 ```json
 {
   "session_id": "...",
-  "user_text": "...",
-  "user_audio_url": "/static/audio/<uuid>.mp3",
-  "coach_text": "...",
+  "user_text": "I goed to the market",
+  "user_audio_url": "/static/audio/stt/stt_<uuid>.webm",
+  "coach_text": "Nice try! The past of 'go' is 'went'.",
   "coach_audio_url": "/static/audio/<uuid>.mp3",
   "corrections": [
     {
-      "id": "...",
-      "original_phrase": "...",
-      "corrected_phrase": "...",
-      "explanation": "...",
+      "original_phrase": "I goed",
+      "corrected_phrase": "I went",
+      "explanation": "Use the past simple 'went'.",
       "error_level": "A2",
       "category": "grammar",
-      "timestamp": "..."
+      "severity": "minor"
     }
   ]
 }
 ```
 
 Errors:
-- 400 if both `text` and `audio` are missing or both present.
-- 422 if `audio` MIME type is unsupported.
-- 502 if LLM upstream fails after retries.
 
-### `GET /api/corrections?session_id=...`
+- `400` — neither or both of `text`/`audio` supplied.
+- `422` — unsupported audio MIME type.
+- `429` — demo message limit reached.
+- `502` — STT failure or malformed LLM JSON after one retry.
+- OmniRoute transport failure — `200` with `X-Fallback` and a fallback reply.
 
-Returns the full corrections history for the session. Pagination:
-`?limit=20&offset=0`.
+#### `GET/POST /api/level?session_id=...`
 
-### `POST /api/level`
+`GET` returns the current level. `POST` accepts:
 
-Body: `{"level": "A1"|"A2"|"B1"|"B2"|"C1"|"C2"}`. Persists in session state.
-
-### `POST /api/conversation/reset`
-
-Clears conversation history and corrections for the session.
-
-### `GET /api/conversation/summary`
-
-Returns a 1-paragraph summary of the conversation (LLM-generated).
-
----
-
-## 5. LLM prompt design (system message skeleton)
-
-```
-You are COACH, a friendly English teacher chatting with a student on WhatsApp.
-
-Student level: {LEVEL} (CEFR).
-Tone: encouraging, natural, like a native speaker texting.
-
-Rules:
-- Reply in English. Keep it short (1-3 sentences).
-- Continue the conversation naturally.
-- Detect errors in the student's last message.
-- For each error, output:
-  - original_phrase, corrected_phrase, explanation, error_level (CEFR), category.
-- Only return errors that you are confident about. If no errors, return [].
-- error_level rubric:
-  - A1: present simple, basic vocabulary, articles (a/the)
-  - A2: past simple, present perfect, common prepositions
-  - B1: conditionals, modals, phrasal verbs, basic relative clauses
-  - B2: passive voice, mixed conditionals, nuanced prepositions
-  - C1: subjunctive, inversion, advanced vocabulary, idiomatic expressions
-  - C2: stylistic nuances, register shifts, rare exceptions
-- Always return strict JSON: {"reply": "...", "corrections": [...]}.
-- No prose outside the JSON.
+```json
+{"level": "B1"}
 ```
 
+Valid levels: `A1`, `A2`, `B1`, `B2`, `C1`, `C2`.
+
+#### `GET /api/corrections?session_id=...&limit=20&offset=0`
+
+Returns `{"corrections": [...], "total": n}`. `limit` must be between 1 and
+100; `offset` must be non-negative.
+
+#### `GET /api/conversation/summary?session_id=...`
+
+Returns a one-paragraph summary, or a placeholder when there is no
+conversation.
+
+#### `POST /api/conversation/reset?session_id=...`
+
+Clears the English conversation messages for the session.
+
+#### `GET /api/settings?session_id=...`
+
+Returns the stored provider/model. `POST /api/settings` accepts:
+
+```json
+{"session_id": "...", "provider": "omniroute", "model": "auto/best-coding"}
+```
+
+The backend supports `omniroute`, `minimax`, `openai`, `anthropic` and `groq`
+providers. Unknown providers return `422`.
+
+### 3.2 Interview endpoints
+
+All routes are prefixed with `/api/interview`. The session id is sent as a
+query parameter on GET routes and as a form field on mutations.
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/skills` | List stages and the current answer limit. |
+| `POST` | `/setup` | Multipart: `session_id`, `interview_type`, and `job_text` or `job_file`. Returns the brief and opening message. |
+| `GET` | `/session?session_id=...` | Restore messages, feedback, scores and report. |
+| `POST` | `/chat` | Multipart: `session_id` and one of `text`/`audio`. Returns interviewer reply, score and feedback. |
+| `GET` | `/feedback?session_id=...&limit=20&offset=0` | Paginated feedback history. |
+| `POST` | `/report?session_id=...` | Generate and store the end-of-interview report. |
+| `POST` | `/reset?session_id=...&keep_setup=true` | Clear progress; `keep_setup=false` requires a new setup. |
+
+Interview errors include `400` for invalid input combinations, `409` when the
+interview is not configured, `413` for oversized uploads, `422` for invalid
+offers or audio MIME types, `429` at the answer limit, and `502` for
+transcription failures.
+
 ---
 
-## 6. Tasks (DoD)
+## 4. Frontend behavior and design
 
-1. `feat/initial-scaffold` — Next.js + FastAPI + uv + Docker. Both run via `docker compose up`. Health check 200. → merges via PR.
-2. `feat/backend-core` — Chat endpoint, LLM client, JSON schema validation, level filtering. Tests for filter function. → PR.
-3. `feat/backend-audio` — STT + TTS, multipart handling, static audio serving. Tests. → PR.
-4. `feat/frontend-chat` — Chat tab UI, message input (text + mic), audio playback. → PR.
-5. `feat/frontend-corrections` — Live correction panel + corrections-history tab. → PR.
-6. `feat/topbar-levels` — Level selector + theme toggle. → PR.
-7. `feat/e2e-tests` — Playwright e2e covering text path, audio path, correction filtering. Screenshots on success. → PR.
-8. `feat/render-deploy` — Dockerfile + render.yaml. Manual deploy verified by Daviid. → PR.
-
-Each PR must:
-- Be on its own branch.
-- Pass `uv run pytest -v` (backend) and `npm test` (frontend).
-- Include screenshots if UI changed.
-- Be pushed with `git push origin <branch>`. NEVER to main.
-- Reference an issue number (will create one per task).
+- Shared forest-green palette defined in `app/globals.css`; typography uses
+  Plus Jakarta Sans with system fallbacks.
+- CSS Modules for component and page styles. No Tailwind or SWR.
+- Responsive layout: the landing cards stack on small screens; the composer,
+  level selector and header actions adapt to mobile.
+- Theme is persisted in `localStorage` via `useTheme`.
+- Every message bubble renders its text and, when available, an inline audio
+  player. Audio playback is optional; text is always present.
+- The composer sends text on Enter and supports Shift+Enter for a newline.
+  Holding the mic records and releases to send.
+- Accessibility: labelled controls, keyboard-dismissable modals, visible
+  focus states and semantic buttons.
 
 ---
 
-## 7. Open questions for Daviid (blockers if not answered)
+## 5. Configuration, deployment and testing
 
-1. **LLM provider**: confirm `MINIMAX_API_KEY` is available, or which model?
-   Default assumption: `MiniMax-M2.7-highspeed` via the same config as before.
-2. **Render redeploy**: do we point the existing `ai-coach-pnf5` service at the new repo, or create a new service and swap DNS later?
-3. **Database**: persistence is in-process for v2. Is that OK for the demo, or do you want SQLite from day 1?
-4. **TTS voice**: any preference? Default `en-US-AriaNeural` (warm female).
+### Configuration
+
+| Variable | Default |
+|---|---|
+| `OMNIROUTE_BASE_URL` | `http://localhost:8082/v1` (code) / `http://host.docker.internal:20128/v1` (Compose) |
+| `OMNIROUTE_API_KEY` | empty |
+| `OMNIROUTE_DEFAULT_MODEL` | `auto/best-chat` (code) / `demo-combo` (Compose) |
+| `OMNIROUTE_DEFAULT_COMBO_FALLBACK` | `primary-chain` |
+| `MINIMAX_API_KEY` | empty |
+| `DEMO_MESSAGE_LIMIT` | `5` (`-1` unlimited) |
+| `INTERVIEW_MESSAGE_LIMIT` | `20` (`-1` unlimited) |
+| `AUDIO_CLEANUP_INTERVAL_SECONDS` | `3600` |
+| `AUDIO_MAX_AGE_SECONDS` | `3600` |
+| `NEXT_PUBLIC_API_URL` | empty (same-origin) |
+| `BACKEND_URL` | `http://backend:8091` |
+
+### Deployment
+
+- `docker compose up -d --build` starts the two-service stack.
+- Host ports: backend `18100` → `8091`, frontend `18101` → `3000`.
+- `start.sh` is the single-container PaaS variant (backend `8091`, frontend
+  `$PORT`, default `10000`).
+- The frontend rewrite proxies `/api/*`, `/static/audio/*` and `/audio/*`.
+
+### Testing
+
+```bash
+cd backend && uv run pytest -v
+cd frontend && npm test
+cd frontend && npm run build
+make e2e                 # optional Playwright harness
+```
+
+---
+
+## 6. Non-goals and limitations
+
+- No database or durable conversation history. Backend restarts clear
+  sessions, corrections, interview feedback and reports.
+- No authentication or multi-user isolation beyond separate browser session
+  ids.
+- No streaming LLM responses; replies arrive as complete JSON turns.
+- No guarantee that OmniRoute or TTS providers are available. The app degrades
+  to MiniMax/offline coaching or text-only turns instead of failing the chat.
+- Interview readiness is practice feedback, not a hiring decision.
+- `specs/` contains historical feature notes; it is not part of the current
+  runtime contract.

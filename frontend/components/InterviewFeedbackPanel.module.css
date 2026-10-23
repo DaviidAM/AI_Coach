@@ -1,10 +1,12 @@
 .panel {
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  padding: 0.7rem 1rem;
-  max-height: 34vh;
-  overflow-y: auto;
   flex-shrink: 0;
+  max-height: 30vh;
+  margin: 0.25rem 0.25rem 0.5rem;
+  padding: 0.7rem 0.9rem;
+  overflow-y: auto;
+  border: 1px solid var(--chat-banner-border);
+  border-radius: 0.85rem;
+  background: var(--chat-banner-bg);
 }
 
 .header {
@@ -32,8 +34,8 @@
   gap: 0.1rem;
   padding: 0.15rem 0.5rem;
   border-radius: 99px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--chat-card-bg) 55%, transparent);
+  border: 1px solid var(--chat-banner-border);
   font-variant-numeric: tabular-nums;
 }
 
@@ -81,9 +83,9 @@
 }
 
 .card {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-left: 3px solid var(--accent-cyan);
+  background: color-mix(in srgb, var(--chat-card-bg) 55%, transparent);
+  border: 1px solid var(--chat-banner-border);
+  border-left: 3px solid var(--chat-accent-soft);
   border-radius: 10px;
   padding: 0.6rem 0.7rem;
   font-size: 0.8125rem;
@@ -195,8 +197,8 @@
 
 @media (max-width: 640px) {
   .panel {
-    max-height: 32vh;
-    padding: 0.6rem 0.75rem;
+    max-height: 26vh;
+    padding: 0.6rem 0.7rem;
   }
 }
 

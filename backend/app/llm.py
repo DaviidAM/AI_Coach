@@ -61,6 +61,12 @@ class LLMError(Exception):
     pass
 
 
+# Errors that mean "the provider could not answer", not "the model returned
+# malformed JSON". They are recoverable through the mock/offline fallback so a
+# network problem never becomes an HTTP 500 for the user.
+LLM_CALL_ERRORS = (LLMError, httpx.HTTPError, KeyError, ValueError, OSError)
+
+
 def build_messages(level: str, history: list[dict]) -> list[dict]:
     system = SYSTEM_PROMPT.format(LEVEL=level)
     messages = [{"role": "system", "content": system}]
@@ -163,7 +169,8 @@ def _mock_reply(level: str, history: list[dict]) -> dict:
 
 
 def call_minimax(messages: list[dict], retry: bool = False) -> str:
-    if not MINIMAX_API_KEY:
+    api_key = os.getenv("MINIMAX_API_KEY", "")
+    if not api_key:
         raise LLMError("MINIMAX_API_KEY not set")
 
     payload = {
@@ -178,17 +185,24 @@ def call_minimax(messages: list[dict], retry: bool = False) -> str:
         })
 
     headers = {
-        "Authorization": f"Bearer {MINIMAX_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.post(f"{MINIMAX_BASE_URL}/text/chatcompletion_v2", headers=headers, json=payload)
-        if resp.status_code != 200:
-            raise LLMError(f"Minimax API returned {resp.status_code}: {resp.text}")
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(f"{MINIMAX_BASE_URL}/text/chatcompletion_v2", headers=headers, json=payload)
+    except httpx.HTTPError as exc:
+        raise LLMError(f"Minimax request failed: {exc}") from exc
+
+    if resp.status_code != 200:
+        raise LLMError(f"Minimax API returned {resp.status_code}: {resp.text}")
+    try:
         result = resp.json()
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return content
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise LLMError(f"Minimax returned an invalid response: {exc}") from exc
+    return content
 
 
 def call_llm(messages: list[dict], settings: dict) -> str:
@@ -233,8 +247,13 @@ def call_llm(messages: list[dict], settings: dict) -> str:
 
         def _do_request(model_to_use: str) -> httpx.Response:
             payload["model"] = model_to_use
-            with httpx.Client(timeout=60.0) as client:
-                return client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+            try:
+                with httpx.Client(timeout=60.0) as client:
+                    return client.post(
+                        f"{base_url}/chat/completions", headers=headers, json=payload
+                    )
+            except httpx.HTTPError as exc:
+                raise LLMError(f"{provider} request failed: {exc}") from exc
 
         resp = _do_request(model)
         # OmniRoute combo fallback: 401/404 on custom combo → retry with fallback
@@ -288,31 +307,42 @@ def get_llm_reply(level: str, history: list[dict], settings: dict | None = None)
     """
     Get LLM reply. Uses settings dict {provider, model} if provided,
     otherwise defaults to DEFAULT_SETTINGS.
-    Returns (result_dict, fallback_reason). fallback_reason is non-None
-    when a mock fallback occurred (e.g. API key unset).
+
+    Returns ``(result_dict, fallback_reason)``. ``fallback_reason`` is non-None
+    when the configured provider could not be reached (or had no key) and the
+    offline MiniMax/mock chain was used. Malformed JSON is retried once and
+    then surfaced as ``LLMError`` (the API maps that to 502).
     """
     if settings is None:
         settings = DEFAULT_SETTINGS.copy()
 
     messages = build_messages(level, history)
-    fallback_reason: str | None = None
+
+    def offline_fallback(reason: str) -> tuple[dict, str]:
+        """Try MiniMax when configured, then the local rule-based coach."""
+        if settings.get("provider") != "minimax" and os.getenv("MINIMAX_API_KEY"):
+            try:
+                return parse_and_validate_reply(call_minimax(messages)), reason
+            except LLM_CALL_ERRORS as exc:
+                reason = f"{reason}; MiniMax fallback failed: {exc}"
+        return _mock_reply(level, history), reason
+
+    def attempt() -> dict:
+        return parse_and_validate_reply(call_llm(messages, settings))
 
     try:
-        raw = call_llm(messages, settings)
-    except LLMError as e:
-        # Fall back to mock when API key is missing; capture the reason
-        fallback_reason = str(e)
-        return _mock_reply(level, history), fallback_reason
-
-    try:
-        return parse_and_validate_reply(raw), None
-    except (json.JSONDecodeError, ValueError):
+        return attempt(), None
+    except (json.JSONDecodeError, ValueError, KeyError):
         try:
-            # Retry once
-            raw = call_llm(messages, settings)
-            return parse_and_validate_reply(raw), None
-        except Exception as e:
-            raise LLMError(f"LLM returned malformed JSON after retry: {raw[:200]}") from e
+            return attempt(), None
+        except (json.JSONDecodeError, ValueError, KeyError) as exc:
+            raise LLMError(f"LLM returned malformed JSON after retry: {exc}") from exc
+        except LLM_CALL_ERRORS as exc:
+            return offline_fallback(str(exc))
+    except LLM_CALL_ERRORS as exc:
+        # Network failure, missing key or provider error: keep the coach
+        # usable instead of leaking an internal server error to the UI.
+        return offline_fallback(str(exc))
 
 
 def summarize_conversation(level: str, history: list[dict]) -> str:
