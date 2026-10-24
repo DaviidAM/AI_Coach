@@ -133,6 +133,22 @@
   margin: 0 0.5rem;
 }
 
+.demoCounterAmber {
+  color: #f59e0b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0.5rem;
+}
+
+.demoCounterRed {
+  color: #ef4444;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0.5rem;
+}
+
 .demoLimitFlag {
   display: inline-flex;
   align-items: center;
