@@ -14,7 +14,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent-indigo);
+  background: var(--chat-accent);
   animation: bounce 1.2s infinite ease-in-out;
 }
 
@@ -28,6 +28,6 @@
 
 .label {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--chat-muted);
   font-weight: 500;
 }

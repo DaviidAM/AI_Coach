@@ -13,6 +13,7 @@ from app.api.level import router as level_router
 from app.api.conversation import router as conversation_router
 from app.api.corrections import router as corrections_router
 from app.api.settings import router as settings_router
+from app.api.interview import router as interview_router
 from app.session import DEMO_MESSAGE_LIMIT, get_demo_limit
 from app.audio_janitor import run_janitor
 
@@ -70,3 +71,4 @@ app.include_router(level_router, tags=["level"])
 app.include_router(conversation_router, tags=["conversation"])
 app.include_router(corrections_router, tags=["corrections"])
 app.include_router(settings_router, tags=["settings"])
+app.include_router(interview_router, tags=["interview"])

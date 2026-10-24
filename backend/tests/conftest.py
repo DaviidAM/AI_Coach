@@ -24,6 +24,15 @@ def _reset_session_store():
     store.reset_all()
 
 
+@pytest.fixture(autouse=True)
+def _reset_interview_store():
+    """Clear the interview session store so tests never share interview state."""
+    from app.interview.store import store as interview_store
+    interview_store.reset_all()
+    yield
+    interview_store.reset_all()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # FR-2: STT model isolation
 # ─────────────────────────────────────────────────────────────────────────────
@@ -59,6 +68,22 @@ def isolate_audio_dirs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(chat_module, "_AUDIO_DIR", audio_dir)
     monkeypatch.setattr(chat_module, "_STT_DIR", stt_dir)
+
+    return audio_dir, stt_dir
+
+
+@pytest.fixture
+def isolate_interview_audio_dirs(tmp_path, monkeypatch):
+    """Patch interview audio paths so tests never touch static/audio."""
+    from app.interview import audio as interview_audio
+
+    audio_dir = tmp_path / "interview-audio"
+    stt_dir = audio_dir / "stt"
+    audio_dir.mkdir(exist_ok=True)
+    stt_dir.mkdir(exist_ok=True)
+
+    monkeypatch.setattr(interview_audio, "_AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(interview_audio, "_STT_DIR", stt_dir)
 
     return audio_dir, stt_dir
 

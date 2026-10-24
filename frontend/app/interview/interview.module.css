@@ -1,0 +1,20 @@
+/* Interview-coach-specific styles. Shared chat layout, bubbles, audio,
+ * composer and speaker labels live in components/chat/chat.module.css. */
+
+.setupCta {
+  margin-top: 0.75rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d4e886, #9dbd44);
+  box-shadow: 0 0 25px rgb(194 220 109 / 0.22);
+  color: #122216;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.setupCta:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}

@@ -106,12 +106,16 @@ class TestSavedRecordings:
         test_uuid = str(uuid.uuid4())
 
         with patch("app.api.chat.transcribe", return_value="Hello world"):
-            with patch("app.api.chat.synthesize", new_callable=AsyncMock):
-                response = client.post(
-                    "/api/chat",
-                    data={"session_id": f"test-recording-{test_uuid}"},
-                    files={"audio": ("test.webm", fake_audio, "audio/webm")},
-                )
+            with patch(
+                "app.api.chat.get_llm_reply",
+                return_value=({"reply": "test", "corrections": []}, None),
+            ):
+                with patch("app.api.chat.synthesize", new_callable=AsyncMock):
+                    response = client.post(
+                        "/api/chat",
+                        data={"session_id": f"test-recording-{test_uuid}"},
+                        files={"audio": ("test.webm", fake_audio, "audio/webm")},
+                    )
 
         assert response.status_code == 200
         data = response.json()
@@ -133,11 +137,15 @@ class TestSavedRecordings:
         """Text-only chat should not create anything under static/audio/stt/."""
         import uuid
         sid = f"test-text-only-{uuid.uuid4()}"
-        with patch("app.api.chat.synthesize", new_callable=AsyncMock):
-            response = client.post(
-                "/api/chat",
-                data={"text": "Hello, how are you?", "session_id": sid},
-            )
+        with patch(
+            "app.api.chat.get_llm_reply",
+            return_value=({"reply": "test", "corrections": []}, None),
+        ):
+            with patch("app.api.chat.synthesize", new_callable=AsyncMock):
+                response = client.post(
+                    "/api/chat",
+                    data={"text": "Hello, how are you?", "session_id": sid},
+                )
         assert response.status_code == 200
         data = response.json()
         # user_audio_url is now set (TTS synthesized for the user's text input),

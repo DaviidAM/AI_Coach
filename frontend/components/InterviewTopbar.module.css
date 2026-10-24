@@ -1,0 +1,33 @@
+/* Interview-coach-specific header detail. Shared header framing, pills and
+ * session banner live in components/chat/CoachHeader and HeaderControls. */
+
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.25rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--chat-pill-border);
+  background: var(--chat-pill-bg);
+  color: var(--text-secondary);
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.intro {
+  border-color: color-mix(in srgb, var(--chat-accent-soft) 45%, transparent);
+  color: var(--chat-accent-soft);
+}
+
+.technical {
+  border-color: color-mix(in srgb, var(--chat-accent) 45%, transparent);
+  color: var(--chat-accent);
+}
+
+.final {
+  border-color: color-mix(in srgb, #f0b86e 50%, transparent);
+  color: #f0b86e;
+}

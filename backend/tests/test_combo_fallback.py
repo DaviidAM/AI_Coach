@@ -7,7 +7,7 @@ before propagating the error.
 """
 import uuid
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -84,10 +84,11 @@ class TestComboFallback:
                 mock_instance.__exit__ = MagicMock(return_value=False)
                 mock_client_cls.return_value = mock_instance
 
-                resp = client.post("/api/chat", data={
-                    "session_id": sid,
-                    "text": "Hello",
-                })
+                with patch("app.api.chat.synthesize", new_callable=AsyncMock):
+                    resp = client.post("/api/chat", data={
+                        "session_id": sid,
+                        "text": "Hello",
+                    })
             # If fallback was triggered, we should see 200 (fallback succeeded)
             assert call_count["fallback_used"], (
                 f"Expected fallback to be triggered after 401, but it wasn't. "
@@ -156,10 +157,11 @@ class TestComboFallback:
                 mock_instance.__exit__ = MagicMock(return_value=False)
                 mock_client_cls.return_value = mock_instance
 
-                resp = client.post("/api/chat", data={
-                    "session_id": sid,
-                    "text": "Hello",
-                })
+                with patch("app.api.chat.synthesize", new_callable=AsyncMock):
+                    resp = client.post("/api/chat", data={
+                        "session_id": sid,
+                        "text": "Hello",
+                    })
             assert call_count["fallback_used"], (
                 f"Expected fallback to be triggered after 404, but it wasn't. "
                 f"Calls made: {call_count['total']}"

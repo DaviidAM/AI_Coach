@@ -21,16 +21,8 @@
   border: none;
   cursor: pointer;
   transition: transform 0.1s ease, background 0.15s ease, opacity 0.15s ease;
-}
-
-.bubbleAudio.bubbleUser .playBtn {
-  background: var(--accent-indigo);
-  color: #fff;
-}
-
-.bubbleAudio.bubbleCoach .playBtn {
-  background: var(--accent-indigo);
-  color: #fff;
+  background: var(--chat-accent);
+  color: var(--text-on-accent);
 }
 
 .playBtn:hover {
@@ -68,7 +60,7 @@
   min-height: 4px;
   max-height: 22px;
   border-radius: 999px;
-  background: var(--accent-indigo);
+  background: var(--chat-accent-soft);
   opacity: 0.45;
   transition: opacity 0.15s ease, transform 0.15s ease;
   transform-origin: center;
@@ -78,24 +70,12 @@
   opacity: 1;
 }
 
-/* The waveform bars need to contrast with the audio bubble background.
- * User bubble = indigo background → bars must be WHITE/light
- * Coach bubble = neutral background → bars stay indigo */
-
-/* =============================================================================
- * Audio player style overrides — applied via descendant selectors
- *
- * The AudioPlayer component lives inside .bubbleAudio (in chat.module.css).
- * We override the player's internal colors from here so we don't need to
- * pass extra props for theming — the parent bubble class is the source
- * of truth.
- * ============================================================================= */
-
-/* Bar + label colors: both bubbles now share the same dark surface,
- * so the indigo waveform + text-secondary labels work on both. */
+/* Both speakers share the same dark audio surface, so the indigo waveform
+ * and secondary labels work for everyone. The wrapper marks the speaker
+ * with data-audio-bubble="user|coach". */
 :global([data-audio-bubble="user"]) .bar,
 :global([data-audio-bubble="coach"]) .bar {
-  background: var(--accent-indigo);
+  background: var(--chat-accent-soft);
   opacity: 0.45;
 }
 
@@ -108,7 +88,7 @@
 :global([data-audio-bubble="user"]) .duration,
 :global([data-audio-bubble="coach"]) .label,
 :global([data-audio-bubble="coach"]) .duration {
-  color: var(--text-secondary);
+  color: var(--chat-muted);
 }
 
 .meta {
@@ -133,16 +113,6 @@
 .duration {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.6875rem;
-}
-
-/* The audio bubble color comes from the data-audio-bubble attribute on
- * the wrapper (see .bubbleAudio.bubbleUser / .bubbleCoach in
- * chat.module.css) plus the [data-audio-bubble="..."] selectors below.
- * Both bubbles share the same dark surface so we only need one rule. */
-
-.bubbleAudio .label,
-.bubbleAudio .duration {
-  color: var(--text-secondary);
 }
 
 .error {
