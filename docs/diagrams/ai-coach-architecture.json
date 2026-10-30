@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Coach — System Architecture",
+    "output": "docs/diagrams/ai-coach-architecture.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DaviidAM/AI_Coach.git",
+      "provider": "github",
+      "revision": "de50a628d64f1beeff52ad75512db3e92e579e92"
+    }
+  },
+  "components": [
+    {
+      "id": "learner",
+      "type": "external",
+      "label": "Learner",
+      "sublabel": "browser session",
+      "pos": [40, 40],
+      "size": [150, 62],
+      "icon": "person",
+      "sources": [{ "path": "frontend/app/english/page.tsx", "line": 79, "end_line": 92, "label": "English Coach page" }]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Next.js frontend",
+      "sublabel": "App Router · :3000",
+      "pos": [40, 200],
+      "size": [180, 76],
+      "tag": "/ · /english · /interview",
+      "sources": [
+        { "path": "frontend/app/page.tsx", "line": 13, "end_line": 17, "label": "Landing page" },
+        { "path": "frontend/app/layout.tsx", "line": 1, "end_line": 19, "label": "Root layout" }
+      ]
+    },
+    {
+      "id": "chatui",
+      "type": "frontend",
+      "label": "Shared chat kernel",
+      "sublabel": "components/chat",
+      "pos": [260, 200],
+      "size": [180, 76],
+      "tag": "bubbles · composer · player",
+      "sources": [{ "path": "frontend/components/chat/index.ts", "line": 1, "end_line": 10, "label": "Shared exports" }]
+    },
+    {
+      "id": "rewrite",
+      "type": "cloud",
+      "label": "Next.js rewrites",
+      "sublabel": "same-origin proxy",
+      "pos": [480, 200],
+      "size": [170, 76],
+      "tag": "/api/* · /static/audio/*",
+      "sources": [{ "path": "frontend/next.config.js", "line": 14, "end_line": 27, "label": "Rewrite rules" }]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI backend",
+      "sublabel": ":8091 · 7 routers",
+      "pos": [40, 360],
+      "size": [200, 78],
+      "tag": "chat · interview · level",
+      "sources": [{ "path": "backend/app/main.py", "line": 38, "end_line": 74, "label": "App assembly" }]
+    },
+    {
+      "id": "englishstore",
+      "type": "database",
+      "label": "English session store",
+      "sublabel": "in-memory dict",
+      "pos": [40, 500],
+      "size": [190, 66],
+      "tag": "lost on restart",
+      "sources": [{ "path": "backend/app/session.py", "line": 88, "end_line": 109, "label": "SessionData + store" }]
+    },
+    {
+      "id": "corrstore",
+      "type": "database",
+      "label": "Corrections store",
+      "sublabel": "in-memory dict",
+      "pos": [40, 590],
+      "size": [190, 66],
+      "tag": "per session",
+      "sources": [{ "path": "backend/app/api/corrections.py", "line": 10, "end_line": 41, "label": "Corrections store" }]
+    },
+    {
+      "id": "ivstore",
+      "type": "database",
+      "label": "Interview store",
+      "sublabel": "in-memory dict",
+      "pos": [40, 680],
+      "size": [190, 66],
+      "tag": "brief · feedback · report",
+      "sources": [{ "path": "backend/app/interview/store.py", "line": 48, "end_line": 70, "label": "InterviewStore" }]
+    },
+    {
+      "id": "stt",
+      "type": "backend",
+      "label": "faster-whisper STT",
+      "sublabel": "base · CPU · int8",
+      "pos": [270, 500],
+      "size": [190, 66],
+      "tag": "audio → text",
+      "sources": [{ "path": "backend/app/stt.py", "line": 10, "end_line": 30, "label": "STT model" }]
+    },
+    {
+      "id": "edgetts",
+      "type": "backend",
+      "label": "edge-tts",
+      "sublabel": "en-US-AriaNeural",
+      "pos": [270, 590],
+      "size": [190, 66],
+      "tag": "primary TTS",
+      "sources": [{ "path": "backend/app/tts.py", "line": 29, "end_line": 36, "label": "Voice + Google endpoints" }]
+    },
+    {
+      "id": "janitor",
+      "type": "backend",
+      "label": "Audio janitor",
+      "sublabel": "background sweep",
+      "pos": [270, 680],
+      "size": [190, 66],
+      "tag": "hourly",
+      "sources": [{ "path": "backend/app/audio_janitor.py", "line": 16, "end_line": 60, "label": "Janitor task" }]
+    },
+    {
+      "id": "audiodisk",
+      "type": "database",
+      "label": "Audio files",
+      "sublabel": "app/static/audio",
+      "pos": [520, 500],
+      "size": [180, 66],
+      "tag": "docker volume",
+      "sources": [{ "path": "backend/app/main.py", "line": 60, "end_line": 66, "label": "Static mount" }]
+    },
+    {
+      "id": "omniroute",
+      "type": "external",
+      "label": "OmniRoute gateway",
+      "sublabel": "OpenAI-compatible",
+      "pos": [790, 360],
+      "size": [190, 70],
+      "tag": "default provider",
+      "sources": [{ "path": "backend/app/llm.py", "line": 19, "end_line": 34, "label": "OmniRoute provider + defaults" }]
+    },
+    {
+      "id": "upstream",
+      "type": "external",
+      "label": "Upstream LLM",
+      "sublabel": "free model",
+      "pos": [790, 470],
+      "size": [190, 66],
+      "sources": [{ "path": "backend/app/llm.py", "line": 208, "end_line": 245, "label": "call_llm dispatch" }]
+    },
+    {
+      "id": "minimax",
+      "type": "external",
+      "label": "MiniMax",
+      "sublabel": "optional fallback",
+      "pos": [790, 570],
+      "size": [190, 66],
+      "tag": "needs API key",
+      "sources": [{ "path": "backend/app/llm.py", "line": 306, "end_line": 345, "label": "get_llm_reply fallback chain" }]
+    },
+    {
+      "id": "googletts",
+      "type": "external",
+      "label": "Google Translate TTS",
+      "sublabel": "fallback engine",
+      "pos": [790, 670],
+      "size": [190, 66],
+      "tag": "chunked 180 chars",
+      "sources": [{ "path": "backend/app/tts.py", "line": 155, "end_line": 186, "label": "TTS fallback chain" }]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Next.js container :3000", "wraps": ["frontend", "chatui", "rewrite"] },
+    { "kind": "region", "label": "FastAPI process :8091", "wraps": ["api", "englishstore", "corrstore", "ivstore", "stt", "edgetts", "janitor"] },
+    { "kind": "region", "label": "External services", "wraps": ["omniroute", "upstream", "minimax", "googletts"] }
+  ],
+  "connections": [
+    { "id": "learner-frontend", "from": "learner", "to": "frontend", "label": "text or held audio", "variant": "emphasis" },
+    { "id": "frontend-chatui", "from": "frontend", "to": "chatui", "label": "renders" },
+    { "id": "chatui-rewrite", "from": "chatui", "to": "rewrite", "label": "fetch('/api/…')" },
+    { "id": "rewrite-api", "from": "rewrite", "to": "api", "label": "proxy POST /api/chat" },
+    { "id": "api-englishstore", "from": "api", "to": "englishstore", "label": "session state" },
+    { "id": "api-corrstore", "from": "api", "to": "corrstore", "label": "store corrections" },
+    { "id": "api-ivstore", "from": "api", "to": "ivstore", "label": "interview state" },
+    { "id": "api-stt", "from": "api", "to": "stt", "label": "transcribe bytes" },
+    { "id": "api-edgetts", "from": "api", "to": "edgetts", "label": "synthesize text" },
+    { "id": "edgetts-googletts", "from": "edgetts", "to": "googletts", "label": "403 → fallback", "variant": "dashed" },
+    { "id": "api-omniroute", "from": "api", "to": "omniroute", "label": "chat/completions", "variant": "emphasis" },
+    { "id": "omniroute-upstream", "from": "omniroute", "to": "upstream", "label": "model request" },
+    { "id": "api-minimax", "from": "api", "to": "minimax", "label": "transport fallback", "variant": "dashed" },
+    { "id": "api-audiodisk", "from": "api", "to": "audiodisk", "label": "write + serve audio" },
+    { "id": "janitor-audiodisk", "from": "janitor", "to": "audiodisk", "label": "delete stale files", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Browser and frontend",
+      "items": [
+        "Three routes share one design system; the landing page only links to the coaches",
+        "Both coaches render the same chat kernel, so a bubble change lands in both",
+        "The browser never learns the backend address: every call is same-origin"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "FastAPI process",
+      "items": [
+        "Seven routers expose chat, level, corrections, conversation, settings, health and interview",
+        "Sessions, corrections and interview state are process-local dictionaries",
+        "Audio files on disk are the only state that survives a restart"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Fallback chains",
+      "items": [
+        "LLM: custom combo → primary-chain → MiniMax → offline rule-based coach",
+        "TTS: edge-tts → Google Translate TTS → text-only answer",
+        "Every fallback keeps the text answer intact and never returns HTTP 500"
+      ]
+    }
+  ]
+}

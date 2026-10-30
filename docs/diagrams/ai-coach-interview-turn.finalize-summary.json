@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "/tmp/opencode/work/candidate.json",
+    "sha256": "cd4449a1fd33d1685fabc4516a7614ca2b8462d210f786390250b006455b3bb3",
+    "bytes": 5481
+  },
+  "artifact": {
+    "path": "/tmp/opencode/work/docs/diagrams/ai-coach-interview-turn.html",
+    "sha256": "c25a58f5660220dc12197b9d7975e92772f0b35f347dee32f8dbd2331fba439b",
+    "bytes": 843296
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/tmp/opencode/work/docs/diagrams/ai-coach-interview-turn.finalize.json",
+    "summaryReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-interview-turn.finalize-summary.json",
+    "browserCheckReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-interview-turn.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2867,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

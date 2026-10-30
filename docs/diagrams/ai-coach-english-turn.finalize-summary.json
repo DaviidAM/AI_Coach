@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "/tmp/opencode/work/candidate.json",
+    "sha256": "35cf89684fbcd4f6874febc6797b64948ba669a329430cae2a262141c371920d",
+    "bytes": 5296
+  },
+  "artifact": {
+    "path": "/tmp/opencode/work/docs/diagrams/ai-coach-english-turn.html",
+    "sha256": "a089b93705cc58c339cde458b48697fedc7bba2e126fced5a60b38a273a12ccf",
+    "bytes": 842800
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/tmp/opencode/work/docs/diagrams/ai-coach-english-turn.finalize.json",
+    "summaryReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-english-turn.finalize-summary.json",
+    "browserCheckReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-english-turn.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3303,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

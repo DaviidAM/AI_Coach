@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/tmp/opencode/work/candidate.json",
+    "sha256": "e71e9e82d42cfeaaf4f26bcdf8ebe01c225442933a574c045de88cb852cef974",
+    "bytes": 7160
+  },
+  "artifact": {
+    "path": "/tmp/opencode/work/docs/diagrams/ai-coach-deployment.html",
+    "sha256": "7864e4d60191e168d0c20cb66c3eec286caca97b0cee537412180fe35ab341da",
+    "bytes": 851710
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/tmp/opencode/work/docs/diagrams/ai-coach-deployment.finalize.json",
+    "summaryReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-deployment.finalize-summary.json",
+    "browserCheckReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-deployment.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3415,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 2,
+      "routesOverSuggestedBends": 3
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "frontend-proxy",
+            "from": "frontend",
+            "to": "proxy",
+            "label": "fetch(&#39;/api/…&#39;)",
+            "collectionIndex": 1,
+            "artifactIndex": 2
+          },
+          "right": {
+            "id": "frontend-pavers",
+            "from": "frontend",
+            "to": "pavers",
+            "label": "alternative build",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "point": [
+            254,
+            210
+          ],
+          "sharedNode": "frontend"
+        },
+        {
+          "left": {
+            "id": "health-backend",
+            "from": "health",
+            "to": "backend",
+            "label": "GET /api/health",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "right": {
+            "id": "network-backend",
+            "from": "network",
+            "to": "backend",
+            "label": "service DNS",
+            "collectionIndex": 6,
+            "artifactIndex": 7
+          },
+          "point": [
+            265,
+            412
+          ],
+          "sharedNode": "backend"
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "id": "frontend-proxy",
+            "from": "frontend",
+            "to": "proxy",
+            "label": "fetch(&#39;/api/…&#39;)",
+            "collectionIndex": 1,
+            "artifactIndex": 2
+          },
+          "bends": 3,
+          "stretch": 1.235
+        },
+        {
+          "relationship": {
+            "id": "health-backend",
+            "from": "health",
+            "to": "backend",
+            "label": "GET /api/health",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "bends": 3,
+          "stretch": 1.258
+        },
+        {
+          "relationship": {
+            "id": "frontend-pavers",
+            "from": "frontend",
+            "to": "pavers",
+            "label": "alternative build",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "bends": 4,
+          "stretch": 1.198
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "frontend → proxy and frontend → pavers cross next to frontend: move node proxy or pavers so the two reach frontend from different sides (for example one level with it, one directly above or below it).",
+      "health → backend and network → backend cross next to backend: move node health or network so the two reach backend from different sides (for example one level with it, one directly above or below it).",
+      "frontend → proxy needs 3 bends: move node frontend or proxy so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "health → backend needs 3 bends: move node health or backend so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "frontend → pavers needs 4 bends: move node frontend or pavers so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}

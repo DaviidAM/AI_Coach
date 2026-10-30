@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Interview Coach — One Answer Turn",
+    "output": "docs/diagrams/ai-coach-interview-turn.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DaviidAM/AI_Coach.git",
+      "provider": "github",
+      "revision": "de50a628d64f1beeff52ad75512db3e92e579e92"
+    }
+  },
+  "participants": [
+    {
+      "id": "candidate",
+      "type": "external",
+      "label": "Candidate",
+      "sublabel": "types an answer",
+      "sources": [{ "path": "frontend/app/interview/page.tsx", "line": 218, "end_line": 240, "label": "Interview page send" }]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Interview UI",
+      "sublabel": "chat + feedback panel",
+      "sources": [{ "path": "frontend/components/InterviewFeedbackPanel.tsx", "line": 33, "end_line": 60, "label": "Feedback panel" }]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "/api/interview/chat",
+      "sources": [{ "path": "backend/app/api/interview.py", "line": 186, "end_line": 230, "label": "Interview chat endpoint" }]
+    },
+    {
+      "id": "skill",
+      "type": "backend",
+      "label": "Interview skill",
+      "sublabel": "rubric + prompt",
+      "sources": [{ "path": "backend/app/interview/skills/base.py", "line": 45, "end_line": 98, "label": "system_prompt builder" }]
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "Interview store",
+      "sublabel": "in-memory",
+      "sources": [{ "path": "backend/app/interview/store.py", "line": 130, "end_line": 165, "label": "append_message + trim" }]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "OmniRoute",
+      "sublabel": "chat/completions",
+      "sources": [{ "path": "backend/app/interview/llm.py", "line": 127, "end_line": 155, "label": "generate_turn" }]
+    },
+    {
+      "id": "tts",
+      "type": "backend",
+      "label": "edge-tts",
+      "sublabel": "int_reply_*.mp3",
+      "sources": [{ "path": "backend/app/interview/audio.py", "line": 64, "end_line": 78, "label": "synthesize_to_url" }]
+    }
+  ],
+  "segments": [
+    { "from": 168, "to": 292, "label": "Guard" },
+    { "from": 308, "to": 462, "label": "Model and feedback" },
+    { "from": 478, "to": 620, "label": "Render" }
+  ],
+  "messages": [
+    { "id": "m1", "from": "candidate", "to": "ui", "y": 160, "label": "answers the question", "variant": "default" },
+    { "id": "m2", "from": "ui", "to": "api", "y": 190, "label": "POST /api/interview/chat (text or audio)", "variant": "emphasis" },
+    { "id": "m3", "from": "api", "to": "store", "y": 220, "label": "is_at_limit → answer count", "variant": "security", "note": "Over the cap the answer is HTTP 429." },
+    { "id": "m4", "from": "store", "to": "api", "y": 300, "label": "under limit → continue", "variant": "return" },
+    { "id": "m5", "from": "api", "to": "store", "y": 330, "label": "append candidate message", "variant": "default" },
+    { "id": "m6", "from": "api", "to": "skill", "y": 360, "label": "system_prompt(brief, turn)", "variant": "default" },
+    { "id": "m7", "from": "api", "to": "llm", "y": 390, "label": "rubric prompt + interview history", "variant": "emphasis" },
+    { "id": "m8", "from": "llm", "to": "api", "y": 420, "label": "{interviewer_reply, score, strengths[], feedback[]}", "variant": "return", "note": "No model? Heuristic rules build the reply and the coaching." },
+    { "id": "m9", "from": "api", "to": "store", "y": 500, "label": "store feedback + score, append interviewer turn", "variant": "default" },
+    { "id": "m10", "from": "api", "to": "tts", "y": 530, "label": "synthesize interviewer reply", "variant": "default" },
+    { "id": "m11", "from": "api", "to": "ui", "y": 560, "label": "200 {interviewer_text, audio_url, feedback[], score}", "variant": "return" },
+    { "id": "m12", "from": "ui", "to": "candidate", "y": 590, "label": "next question + coaching notes", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "ui", "from": 185, "to": 595, "type": "frontend" },
+    { "participant": "api", "from": 190, "to": 565, "type": "backend" },
+    { "participant": "store", "from": 215, "to": 340, "type": "database" },
+    { "participant": "skill", "from": 355, "to": 375, "type": "backend" },
+    { "participant": "llm", "from": 385, "to": 425, "type": "external" },
+    { "participant": "tts", "from": 525, "to": 545, "type": "backend" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Grounded in the offer",
+      "items": [
+        "The stage rubric is a prompt built per turn from the role brief",
+        "Feedback is evaluated against that rubric, not free-form advice",
+        "The interviewer never speaks the coaching notes out loud"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Normalised output",
+      "items": [
+        "answer_score is clamped to 1-5 and feedback is capped at three items",
+        "Feedback aliases and categories are normalised before storage",
+        "If the model returns nothing usable, one polish note is injected"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Works offline",
+      "items": [
+        "Brief, question and coaching fall back to deterministic rules",
+        "The interview stays usable with no LLM at all",
+        "Audio is optional: the text answer always survives"
+      ]
+    }
+  ]
+}

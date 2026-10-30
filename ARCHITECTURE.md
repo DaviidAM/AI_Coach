@@ -13,6 +13,11 @@ transcribes, corrects at the learner's CEFR level and speaks back — plus an
 Interview Coach that turns a job offer into a tailored mock interview and
 coaches every answer.
 
+> **Visual version:** the same system is available as five interactive,
+> self-contained HTML diagrams in [`docs/diagrams/`](docs/diagrams/) — system
+> architecture, one English turn, one interview turn, the audio data flow and
+> the deployment topology. See the [diagram index](docs/diagrams/README.md).
+
 ---
 
 ## Table of contents
@@ -36,6 +41,27 @@ coaches every answer.
 17. [Invariants and known constraints](#17-invariants-and-known-constraints)
 18. [Extension guide](#18-extension-guide)
 19. [Glossary](#19-glossary)
+
+### Visual diagrams
+
+The same system is also documented as five interactive HTML diagrams in
+[`docs/diagrams/`](docs/diagrams/). They are self-contained (no runtime
+dependencies, they open offline) and were generated with the
+[archify](https://github.com/tt-a1i/archify) skill directly from this
+repository, so every component carries source evidence.
+
+| Diagram | Type | What it covers |
+|---|---|---|
+| [System Architecture](docs/diagrams/ai-coach-architecture.html) | architecture | Browser, frontend, FastAPI process, the three in-memory stores, the audio directory, the local speech engines and every external service, grouped by trust boundary |
+| [English Coach — one text turn](docs/diagrams/ai-coach-english-turn.html) | sequence | Enter → `POST /api/chat` → demo-limit gate → LLM → TTS → audio file → bubbles |
+| [Interview Coach — one answer turn](docs/diagrams/ai-coach-interview-turn.html) | sequence | Answer → limit gate → stage rubric → LLM → normalised feedback → interviewer audio → coaching panel |
+| [Audio and text data flow](docs/diagrams/ai-coach-audio-dataflow.html) | dataflow | Microphone → multipart → `stt/` → faster-whisper → prompt → LLM → edge-tts → `audio/*.mp3` → player |
+| [Deployment topology](docs/diagrams/ai-coach-deployment.html) | architecture | Compose services, host ports, named volumes, health checks and the bridge to the host-side gateway |
+
+The Mermaid diagrams in this document and the archify HTML diagrams show the
+same facts from the same source; use the HTML for exploration and the Mermaid
+for diffable, reviewable documentation. Regeneration instructions live in the
+[diagram index](docs/diagrams/README.md).
 
 ---
 

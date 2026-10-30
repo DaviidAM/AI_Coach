@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "AI Coach — Audio and Text Data Flow",
+    "output": "docs/diagrams/ai-coach-audio-dataflow.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DaviidAM/AI_Coach.git",
+      "provider": "github",
+      "revision": "de50a628d64f1beeff52ad75512db3e92e579e92"
+    }
+  },
+  "stages": [
+    { "label": "Capture and upload" },
+    { "label": "Transcribe" },
+    { "label": "Model" },
+    { "label": "Synthesize" },
+    { "label": "Store and play" }
+  ],
+  "nodes": [
+    {
+      "id": "mic",
+      "type": "external",
+      "label": "Microphone",
+      "sublabel": "MediaRecorder",
+      "stage": 0,
+      "row": 0,
+      "tag": "webm/ogg",
+      "sources": [{ "path": "frontend/hooks/useAudioRecorder.ts", "line": 72, "end_line": 95, "label": "getUserMedia + MediaRecorder" }]
+    },
+    {
+      "id": "recording",
+      "type": "frontend",
+      "label": "Recording blob",
+      "sublabel": "in browser memory",
+      "stage": 0,
+      "row": 1,
+      "tag": "ephemeral",
+      "sources": [{ "path": "frontend/hooks/useAudioRecorder.ts", "line": 96, "end_line": 130, "label": "Blob assembly" }]
+    },
+    {
+      "id": "formdata",
+      "type": "frontend",
+      "label": "Multipart POST",
+      "sublabel": "FormData",
+      "stage": 0,
+      "row": 3,
+      "tag": "session_id + audio",
+      "sources": [{ "path": "frontend/lib/api.ts", "line": 82, "end_line": 107, "label": "sendAudio" }]
+    },
+    {
+      "id": "sttdir",
+      "type": "database",
+      "label": "stt/ recordings",
+      "sublabel": "app/static/audio/stt",
+      "stage": 1,
+      "row": 0,
+      "tag": "on disk",
+      "sources": [{ "path": "backend/app/api/chat.py", "line": 115, "end_line": 125, "label": "Save original recording" }]
+    },
+    {
+      "id": "whisper",
+      "type": "backend",
+      "label": "faster-whisper",
+      "sublabel": "base · CPU · int8",
+      "stage": 1,
+      "row": 2,
+      "tag": "audio → text",
+      "sources": [{ "path": "backend/app/stt.py", "line": 16, "end_line": 39, "label": "transcribe" }]
+    },
+    {
+      "id": "prompt",
+      "type": "backend",
+      "label": "Coach prompt",
+      "sublabel": "system + history",
+      "stage": 2,
+      "row": 1,
+      "tag": "CEFR level",
+      "sources": [{ "path": "backend/app/llm.py", "line": 68, "end_line": 76, "label": "build_messages" }]
+    },
+    {
+      "id": "model",
+      "type": "external",
+      "label": "LLM reply",
+      "sublabel": "reply + corrections",
+      "stage": 2,
+      "row": 3,
+      "tag": "JSON",
+      "sources": [{ "path": "backend/app/llm.py", "line": 306, "end_line": 345, "label": "get_llm_reply" }]
+    },
+    {
+      "id": "tts",
+      "type": "backend",
+      "label": "edge-tts",
+      "sublabel": "en-US-AriaNeural",
+      "stage": 3,
+      "row": 0,
+      "tag": "text → mp3",
+      "sources": [{ "path": "backend/app/tts.py", "line": 143, "end_line": 186, "label": "synthesize" }]
+    },
+    {
+      "id": "googletts",
+      "type": "external",
+      "label": "Google TTS",
+      "sublabel": "fallback engine",
+      "stage": 3,
+      "row": 2,
+      "tag": "chunked 180",
+      "sources": [{ "path": "backend/app/tts.py", "line": 31, "end_line": 36, "label": "Google endpoints" }]
+    },
+    {
+      "id": "mp3dir",
+      "type": "database",
+      "label": "audio/*.mp3",
+      "sublabel": "app/static/audio",
+      "stage": 4,
+      "row": 0,
+      "tag": "docker volume",
+      "sources": [{ "path": "backend/app/main.py", "line": 60, "end_line": 66, "label": "Static mount" }]
+    },
+    {
+      "id": "player",
+      "type": "frontend",
+      "label": "Audio player",
+      "sublabel": "<audio> in bubble",
+      "stage": 4,
+      "row": 2,
+      "tag": "user gesture",
+      "sources": [{ "path": "frontend/components/chat/AudioPlayer.tsx", "line": 55, "end_line": 76, "label": "Play control" }]
+    },
+    {
+      "id": "bubble",
+      "type": "frontend",
+      "label": "Chat bubble",
+      "sublabel": "text + audio",
+      "stage": 4,
+      "row": 4,
+      "tag": "always text",
+      "sources": [{ "path": "frontend/components/chat/ChatMessage.tsx", "line": 82, "end_line": 106, "label": "Bubble render" }]
+    }
+  ],
+  "flows": [
+    { "id": "f1", "from": "mic", "to": "recording", "label": "audio chunks", "classification": "raw audio", "variant": "emphasis", "labelDy": 25 },
+    { "id": "f2", "from": "recording", "to": "formdata", "label": "multipart upload", "classification": "request body", "variant": "emphasis", "labelDy": 25 },
+    { "id": "f3", "from": "formdata", "to": "sttdir", "label": "original bytes", "classification": "persisted file", "variant": "default" },
+    { "id": "f4", "from": "sttdir", "to": "whisper", "label": "file bytes", "classification": "transcription input", "variant": "default", "labelDy": 25 },
+    { "id": "f5", "from": "whisper", "to": "prompt", "label": "transcript text", "classification": "derived text", "variant": "emphasis" },
+    { "id": "f6", "from": "prompt", "to": "model", "label": "messages + level", "classification": "prompt payload", "variant": "emphasis", "labelDy": 25 },
+    { "id": "f7", "from": "model", "to": "tts", "label": "reply text", "classification": "answer text", "variant": "emphasis" },
+    { "id": "f8", "from": "tts", "to": "googletts", "label": "403 fallback", "classification": "degraded path", "variant": "dashed", "labelDy": 25 },
+    { "id": "f9", "from": "tts", "to": "mp3dir", "label": "mp3 bytes", "classification": "persisted file", "variant": "default" },
+    { "id": "f10", "from": "googletts", "to": "mp3dir", "label": "chunked mp3", "classification": "persisted file", "variant": "dashed" },
+    { "id": "f11", "from": "mp3dir", "to": "player", "label": "media stream", "classification": "served file", "variant": "default", "labelDy": 25 },
+    { "id": "f12", "from": "player", "to": "bubble", "label": "playback", "classification": "media playback", "variant": "default", "labelDy": 25 }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Text is the contract",
+      "items": [
+        "Every message carries text; audio is an optional companion",
+        "A transcription failure stops the turn with a controlled 502",
+        "If every TTS engine fails the bubble simply has no player"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "What lives on disk",
+      "items": [
+        "Original recordings are kept under stt/ so the user can replay them",
+        "Generated MP3s are written under audio/ and served by the static mount",
+        "The janitor deletes mp3, wav and webm files older than one hour"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Offline degradation",
+      "items": [
+        "No model? The rule-based coach still answers with corrections",
+        "No Edge TTS? Google Translate TTS produces the file instead",
+        "The chat never answers with an HTTP 500 because of audio"
+      ]
+    }
+  ]
+}

@@ -27,3 +27,6 @@ test-results/
 .env.local
 *.pem
 *.key
+
+# Archify working folders (diagram candidates and receipts)
+.archify/

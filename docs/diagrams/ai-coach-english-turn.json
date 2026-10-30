@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "English Coach — One Text Turn",
+    "output": "docs/diagrams/ai-coach-english-turn.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DaviidAM/AI_Coach.git",
+      "provider": "github",
+      "revision": "de50a628d64f1beeff52ad75512db3e92e579e92"
+    }
+  },
+  "participants": [
+    {
+      "id": "learner",
+      "type": "external",
+      "label": "Learner",
+      "sublabel": "types a message",
+      "sources": [{ "path": "frontend/app/english/page.tsx", "line": 79, "end_line": 92, "label": "English page" }]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Chat UI",
+      "sublabel": "components/chat",
+      "sources": [{ "path": "frontend/components/chat/ChatComposer.tsx", "line": 49, "end_line": 62, "label": "Enter to send" }]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "POST /api/chat",
+      "sources": [{ "path": "backend/app/api/chat.py", "line": 79, "end_line": 99, "label": "chat endpoint + limit gate" }]
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "In-memory stores",
+      "sublabel": "session + corrections",
+      "sources": [{ "path": "backend/app/session.py", "line": 100, "end_line": 120, "label": "SessionStore" }]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "OmniRoute",
+      "sublabel": "chat/completions",
+      "sources": [{ "path": "backend/app/llm.py", "line": 208, "end_line": 265, "label": "call_llm" }]
+    },
+    {
+      "id": "tts",
+      "type": "backend",
+      "label": "edge-tts",
+      "sublabel": "en-US-AriaNeural",
+      "sources": [{ "path": "backend/app/tts.py", "line": 143, "end_line": 186, "label": "synthesize" }]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "Audio disk",
+      "sublabel": "app/static/audio",
+      "sources": [{ "path": "backend/app/main.py", "line": 60, "end_line": 66, "label": "Static mount" }]
+    }
+  ],
+  "segments": [
+    { "from": 168, "to": 292, "label": "Guard" },
+    { "from": 308, "to": 462, "label": "Model and audio" },
+    { "from": 478, "to": 620, "label": "Render" }
+  ],
+  "messages": [
+    { "id": "m1", "from": "learner", "to": "ui", "y": 160, "label": "types 'I goed to the store' + Enter", "variant": "default" },
+    { "id": "m2", "from": "ui", "to": "api", "y": 190, "label": "POST /api/chat (multipart: session_id, text)", "variant": "emphasis" },
+    { "id": "m3", "from": "api", "to": "store", "y": 220, "label": "is_at_demo_limit → count user messages", "variant": "security", "note": "Over the cap: HTTP 429, no audio written." },
+    { "id": "m4", "from": "store", "to": "api", "y": 300, "label": "under limit → continue", "variant": "return" },
+    { "id": "m5", "from": "api", "to": "store", "y": 330, "label": "append user message", "variant": "default" },
+    { "id": "m6", "from": "api", "to": "llm", "y": 360, "label": "system prompt + history + CEFR level", "variant": "emphasis" },
+    { "id": "m7", "from": "llm", "to": "api", "y": 390, "label": "{reply, corrections[]}", "variant": "return", "note": "Transport error → offline coach, X-Fallback." },
+    { "id": "m8", "from": "api", "to": "store", "y": 470, "label": "append coach message + store corrections", "variant": "default" },
+    { "id": "m9", "from": "api", "to": "tts", "y": 500, "label": "synthesize user text and coach reply", "variant": "default" },
+    { "id": "m10", "from": "tts", "to": "disk", "y": 530, "label": "write .mp3", "variant": "default" },
+    { "id": "m11", "from": "api", "to": "ui", "y": 560, "label": "200 {text, audio_url, corrections[]}", "variant": "return" },
+    { "id": "m12", "from": "ui", "to": "learner", "y": 590, "label": "bubbles + inline audio player", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "ui", "from": 185, "to": 595, "type": "frontend" },
+    { "participant": "api", "from": 190, "to": 565, "type": "backend" },
+    { "participant": "store", "from": 215, "to": 340, "type": "database" },
+    { "participant": "llm", "from": 355, "to": 395, "type": "external" },
+    { "participant": "tts", "from": 495, "to": 535, "type": "backend" },
+    { "participant": "disk", "from": 525, "to": 545, "type": "database" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Happy path",
+      "items": [
+        "One POST carries the turn: text in, text plus audio out",
+        "The user's own text is synthesized so both bubbles can play",
+        "Corrections are filtered server-side against the CEFR level"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Guard rails",
+      "items": [
+        "The demo-limit gate runs before any STT or TTS work",
+        "Over the cap the answer is HTTP 429, not a broken chat",
+        "STT failure is a controlled 502 and the UI rolls the bubbles back"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Degradation",
+      "items": [
+        "LLM transport failure falls back to MiniMax or the offline coach",
+        "Both TTS engines failing still returns 200 with text only",
+        "Audio is optional everywhere; the text answer always survives"
+      ]
+    }
+  ]
+}

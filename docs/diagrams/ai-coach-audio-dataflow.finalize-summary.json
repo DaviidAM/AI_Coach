@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/tmp/opencode/work/candidate.json",
+    "sha256": "ba07ca841b2640b9113dd7b06b68f859e8b80ea0ede98cb5fcaa7c383815940c",
+    "bytes": 7021
+  },
+  "artifact": {
+    "path": "/tmp/opencode/work/docs/diagrams/ai-coach-audio-dataflow.html",
+    "sha256": "9309d430981cbd5e57872f57d0819dbdf594d7c9693bad5b439f484d4b028d3f",
+    "bytes": 851221
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/tmp/opencode/work/docs/diagrams/ai-coach-audio-dataflow.finalize.json",
+    "summaryReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-audio-dataflow.finalize-summary.json",
+    "browserCheckReceipt": "/tmp/opencode/work/docs/diagrams/ai-coach-audio-dataflow.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3109,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}
