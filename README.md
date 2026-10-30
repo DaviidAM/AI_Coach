@@ -381,6 +381,10 @@ browser installation on the machine running the tests.
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design, routing, data flow and
   session model
+- [docs/diagrams/](docs/diagrams/) — five interactive HTML diagrams (system
+  architecture, one English turn, one interview turn, audio data flow and
+  deployment topology) generated with the [archify](https://github.com/tt-a1i/archify)
+  skill
 - [SPEC.md](SPEC.md) — current product and API specification
 - [docs/interview-coach.md](docs/interview-coach.md) — Interview Coach guide
 - [specs/](specs/) — historical feature specs and implementation notes

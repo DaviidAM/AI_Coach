@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Coach — Deployment Topology",
+    "subtitle": "docker compose on a single host",
+    "output": "docs/diagrams/ai-coach-deployment.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DaviidAM/AI_Coach.git",
+      "provider": "github",
+      "revision": "de50a628d64f1beeff52ad75512db3e92e579e92"
+    }
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Browser",
+      "sublabel": "user session",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        140,
+        60
+      ],
+      "icon": "person",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 96,
+          "end_line": 109,
+          "label": "frontend service"
+        }
+      ]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "frontend container",
+      "sublabel": "Next.js :3000",
+      "pos": [
+        40,
+        180
+      ],
+      "size": [
+        190,
+        74
+      ],
+      "tag": "host 18101",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 96,
+          "end_line": 109,
+          "label": "frontend service"
+        },
+        {
+          "path": "Dockerfile.frontend",
+          "line": 46,
+          "end_line": 58,
+          "label": "Runtime image"
+        }
+      ]
+    },
+    {
+      "id": "backend",
+      "type": "backend",
+      "label": "backend container",
+      "sublabel": "FastAPI :8091",
+      "pos": [
+        40,
+        320
+      ],
+      "size": [
+        190,
+        74
+      ],
+      "tag": "host 18100",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 24,
+          "end_line": 46,
+          "label": "backend service"
+        },
+        {
+          "path": "Dockerfile.backend",
+          "line": 37,
+          "end_line": 44,
+          "label": "Runtime image"
+        }
+      ]
+    },
+    {
+      "id": "volumes",
+      "type": "database",
+      "label": "Audio volumes",
+      "sublabel": "named volumes",
+      "pos": [
+        40,
+        460
+      ],
+      "size": [
+        190,
+        68
+      ],
+      "tag": "survive restarts",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 62,
+          "end_line": 66,
+          "label": "Volume mounts"
+        }
+      ]
+    },
+    {
+      "id": "omniroute",
+      "type": "external",
+      "label": "OmniRoute",
+      "sublabel": "host systemd :20128",
+      "pos": [
+        40,
+        590
+      ],
+      "size": [
+        190,
+        68
+      ],
+      "tag": "host.docker.internal",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 46,
+          "end_line": 48,
+          "label": "extra_hosts bridge"
+        }
+      ]
+    },
+    {
+      "id": "health",
+      "type": "security",
+      "label": "Health checks",
+      "sublabel": "curl probes",
+      "pos": [
+        300,
+        320
+      ],
+      "size": [
+        170,
+        68
+      ],
+      "tag": "both services",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 68,
+          "end_line": 72,
+          "label": "Backend healthcheck"
+        }
+      ]
+    },
+    {
+      "id": "proxy",
+      "type": "cloud",
+      "label": "Next.js rewrites",
+      "sublabel": "same-origin proxy",
+      "pos": [
+        300,
+        180
+      ],
+      "size": [
+        180,
+        68
+      ],
+      "tag": "/api/* · /static/audio/*",
+      "sources": [
+        {
+          "path": "frontend/next.config.js",
+          "line": 14,
+          "end_line": 27,
+          "label": "Rewrite rules"
+        }
+      ]
+    },
+    {
+      "id": "network",
+      "type": "messagebus",
+      "label": "ai-coach-network",
+      "sublabel": "compose bridge",
+      "pos": [
+        300,
+        460
+      ],
+      "size": [
+        170,
+        68
+      ],
+      "tag": "backend DNS",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 117,
+          "end_line": 119,
+          "label": "Network definition"
+        }
+      ]
+    },
+    {
+      "id": "pavers",
+      "type": "cloud",
+      "label": "PaaS image",
+      "sublabel": "start.sh · both processes",
+      "pos": [
+        560,
+        180
+      ],
+      "size": [
+        180,
+        68
+      ],
+      "tag": "alternative",
+      "sources": [
+        {
+          "path": "start.sh",
+          "line": 18,
+          "end_line": 33,
+          "label": "Single container launcher"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Docker host",
+      "wraps": [
+        "frontend",
+        "backend",
+        "volumes",
+        "omniroute",
+        "health",
+        "proxy",
+        "network"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Paas deployment",
+      "wraps": [
+        "pavers"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-frontend",
+      "from": "user",
+      "to": "frontend",
+      "label": "HTTP :18101",
+      "variant": "emphasis"
+    },
+    {
+      "id": "frontend-proxy",
+      "from": "frontend",
+      "to": "proxy",
+      "label": "fetch('/api/…')"
+    },
+    {
+      "id": "proxy-backend",
+      "from": "proxy",
+      "to": "backend",
+      "label": "backend:8091"
+    },
+    {
+      "id": "backend-omniroute",
+      "from": "backend",
+      "to": "omniroute",
+      "label": "chat/completions :20128",
+      "variant": "emphasis"
+    },
+    {
+      "id": "backend-volumes",
+      "from": "backend",
+      "to": "volumes",
+      "label": "read + write audio"
+    },
+    {
+      "id": "health-backend",
+      "from": "health",
+      "to": "backend",
+      "label": "GET /api/health",
+      "variant": "dashed"
+    },
+    {
+      "id": "network-backend",
+      "from": "network",
+      "to": "backend",
+      "label": "service DNS",
+      "variant": "dashed"
+    },
+    {
+      "id": "frontend-pavers",
+      "from": "frontend",
+      "to": "pavers",
+      "label": "alternative build",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Two services, one tree",
+      "items": [
+        "Both images build from the same source tree with separate Dockerfiles",
+        "The frontend depends on a healthy backend before it starts",
+        "Host ports follow the 18xxx range reserved for this project"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Reaching the gateway",
+      "items": [
+        "OmniRoute runs as a systemd service on the host, not in compose",
+        "extra_hosts maps host.docker.internal to the bridge gateway",
+        "The backend reads OMNIROUTE_BASE_URL from the environment"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What survives a restart",
+      "items": [
+        "Audio files live in named volumes and outlive the containers",
+        "Sessions, corrections and interview state are process memory only",
+        "Rebuilding the frontend is required to change NEXT_PUBLIC_API_URL"
+      ]
+    }
+  ]
+}
